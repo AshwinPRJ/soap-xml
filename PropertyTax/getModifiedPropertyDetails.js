@@ -1,50 +1,140 @@
 const soapRequest = require('easy-soap-request');
 const fs = require('fs');
-const transform = require('camaro');
+const args = require("commander");
 const json2csv = require('json2csv').Parser
-const prettifyXml = require('prettify-xml');
-var format = require('xml-formatter');
 var xml2json = require('xml2json');
-var parseString = require('xml2js').parseString;
-var prettyjson = require('prettyjson');
-const util = require('util')
-
-
+var log4js = require('log4js');
+var logger = log4js.getLogger();
+var mysql = require('mysql');
+logger.level = 'debug';
+var config = require('./config/dbconfig.js');
+var connection = mysql.createConnection(config.databaseOptions);
 const url = 'http://103.112.213.209/INDIANCST/indiancst.asmx';
 const headers = {
     'Content-Length': 'length',
     'Content-Type': 'text/xml;charset=UTF-8',
     'soapAction': 'http://tempuri.org/GetModifiedPropertyDetails',
-};
-const xml = `<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+}
+args
+  .version('0.1.0')
+  .option('-w, --wardNo <>', 'Ward No')
+  .option('-f, --fromDate <>', 'from date')
+  .option('-t, --toDate <>', 'to date')
+  .parse(process.argv);
+// Ensure we get minimum required arguments
+if (args.wardNo == undefined) {
+  args.help();
+  process.exit(1);
+}
+if (args.wardNo && isNaN(args.wardNo)) {
+  console.error("wardNo should be a number.");
+  process.exit(1);
+} else {
+  args.wardNo = Number(args.wardNo);
+  connection.connect(function (err) {
+    if (err) throw err;
+    logger.info("Successfully connected to database...");
+    start(args);
+  });
+}
+async function start(args) {
+  let wardNo = "", fromDate = "", toDate = "";
+  if (args.wardNo) wardNo = args.wardNo;
+  if (args.fromDate) fromDate = args.fromDate;
+  if (args.toDate) toDate = args.toDate;
+  logger.info("===============================================================================");
+  logger.info("ward no >>> ", wardNo);
+  logger.info("from date >>> ", fromDate);
+  logger.info("to date >>> ", toDate);
+  return await getMAR19Details(wardNo, fromDate, toDate);
+}
+async function getMAR19Details(wardNo, fromDate, toDate) {
+  logger.debug("params received to pass in request >>> ", wardNo);
+  const xml = `<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
       			  <soap:Body>
       			    <GetModifiedPropertyDetails xmlns="http://tempuri.org/">
-      			      <WardId>1</WardId>
-      			      <FromDate>01/01/2015</FromDate>
-      			      <ToDate>01/01/2019</ToDate>
+      			      <WardId>${wardNo}</WardId>
+      			      <FromDate>${fromDate}</FromDate>
+      			      <ToDate>${toDate}</ToDate>
       			    </GetModifiedPropertyDetails>
       			  </soap:Body>
-      			</soap:Envelope>`;
-(async () => {
-    const { response } = await soapRequest(url, headers, xml, 10000000); // Optional timeout parameter(milliseconds)
-    const { body, statusCode } = response;
-    console.log(body);
-    var json = xml2json.toJson(body);
-    let obj = JSON.parse(json);
-    // console.log("to json -> %s", JSON.parse(json));
-    // console.log("######keys", Object.keys(obj));
-    // console.log("######keys", Object.keys(obj["soap:Envelope"]["soap:Body"]["GetMar19DetailsResponse"]["GetMar19DetailsResult"]["MAR19EntityIndianCST"]));
-    // const result = obj["soap:Envelope"]["soap:Body"]["GetMar19DetailsResponse"]["GetMar19DetailsResult"]["MAR19EntityIndianCST"];
-    // const data = JSON.stringify(result);
-    // const fields = Object.keys(result[0]);
-    // // console.log("keys: ",Object.keys(result[0]));
-    // const json2csvParser = new json2csv({ fields });
-    // const csv = json2csvParser.parse(result);
-    // // console.log(csv)
-    // fs.writeFile('./output/getModifiedPropertyDetails.csv', csv, (err) => {
-    //     if (err) throw err;
-    //     console.log('Data saved!');
-    // });
+            </soap:Envelope>`;
+  //logger.debug("XML parameters >>> ", xml);
+  return await makeRequest(wardNo, xml);
+}
 
-})();
+
+async function makeRequest(wardNo, xml){
+  try {
+    //logger.debug("url >>> ", url);
+    //logger.debug("headers >>> ", headers);
+    //logger.debug("xml >>> ", xml);
+    logger.info("xml request sent >>> ")
+    const { response } = await soapRequest(url, headers, xml, 10000000); // Optional timeout parameter(milliseconds)
+    //logger.debug("response from api: ", response)
+    const { body, statusCode } = response;
+    logger.info("xml response received body >>> ", body)
+    let json = await convertXMLToJson(body);
+    //var answer = json["data"].map(el => Object.values(el));
+
+    //logger.debug("converted xml to json >>> ", json.keys);
+    if (json.keys.length === 0) {
+      logger.error(json.data + wardNo);
+      return;
+    }
+    //let csv = await convertToCSV(json.keys, json.data);
+    //logger.debug("converted json to csv >>> ");
+    //return await writeToFile(csv, wardNo);
+    return await updateDB(json, wardNo);
+  } catch (e) {
+    logger.error(`error occurred for ward ${wardNo} `, e);
+  }
+}
+function convertXMLToJson(body) {
+
+  let toJson = xml2json.toJson(body);
+  let obj = JSON.parse(toJson);
+  logger.debug("converted xml response to JSON obj >>> ");
+  //logger.debug("checking for  data >>> ", obj["soap:Envelope"]["soap:Body"]["GetMar19DetailsResponse"]["GetMar19DetailsResult"]);
+  if (obj["soap:Envelope"]["soap:Body"]["GetModifiedPropertyDetailsResponse"]["GetModifiedPropertyDetailsResult"]["MAR19EntityIndianCST"] == undefined) {
+    return { "keys": [], "data": "data not found for ward no: " }
+  }
+  let result = obj["soap:Envelope"]["soap:Body"]["GetModifiedPropertyDetailsResponse"]["GetModifiedPropertyDetailsResult"]["MAR19EntityIndianCST"];
+  //logger.debug("json stringify data >>",result);
+  let data = JSON.stringify(result);
+  if (!result.length) result = [result];
+  let fields = Object.keys(result[0]);
+  //logger.debug("key name for creating columns >>> ", fields);
+  return { "keys": fields, "data": result }
+}
+function convertToCSV(keys, data) {
+  let json2csvParser = new json2csv({ keys });
+  let csv = json2csvParser.parse(data);
+  return csv;
+}
+async function writeToFile(csv, wardNo) {
+  await fs.writeFile(`./output/error${wardNo}.txt`, csv, (err) => {
+    if (err) throw err;
+    logger.info(`Data saved! for ward ${wardNo}`);
+    logger.info("===============================================================================");
+    connection.end();
+  });
+}
+function updateDB(values, wardNo) {
+  console.log(">>>>>>>", values["data"]);
+  var queries = '';
+  values["data"].forEach(function (item) {
+    console.log(">>>>>>>", item);
+    //queries += mysql.format("UPDATE tblproperty_details SET users = ? WHERE id = ?; ", item);
+  });
+
+  // connection.query(sql, [values], function (err) {
+  //   if (err) {
+  //     return writeToFile(err, wardNo)
+  //   }
+  //   connection.end();
+  //   logger.info(`Data successfully inserted for ${wardNo}`);
+  //   logger.info("===============================================================================");
+  // });
+}
 

@@ -9,13 +9,7 @@ var mysql = require('mysql');
 logger.level = 'debug';
 var config = require('./config/dbconfig.js');
 var connection = mysql.createConnection(config.databaseOptions);
-connection.connect(function (err) {
-  if (err) throw err;
-  logger.info("Successfully connected to database...");
-});
-///////// global variable///////////// 
 const url = 'http://103.112.213.209/INDIANCST/indiancst.asmx';
-
 const headers = {
   'Content-Length': 'length',
   'Content-Type': 'text/xml;charset=UTF-8',
@@ -27,9 +21,22 @@ args
   .option('-f, --fromDate []', 'from date')
   .option('-t, --toDate []', 'to date')
   .parse(process.argv);
-
-start(args);
-
+// Ensure we get minimum required arguments
+if (args.wardNo == undefined) {
+  args.help();
+  process.exit(1);
+}
+if (args.wardNo && isNaN(args.wardNo)) {
+  console.error("wardNo should be a number.");
+  process.exit(1);
+} else { 
+  args.wardNo = Number(args.wardNo); 
+  connection.connect(function (err) {
+    if (err) throw err;
+    logger.info("Successfully connected to database...");
+    start(args);
+  });
+}
 async function start(args) {
   let wardNo="", fromDate="", toDate="";
   if (args.wardNo) wardNo = args.wardNo;
@@ -66,15 +73,17 @@ async function makeRequest(wardNo, xml) {
     const { body, statusCode } = response;
     logger.info("xml response received body >>> ")
     let json = await convertXMLToJson(body);
-    logger.debug("converted xml to json >>> ");
+    var answer = json["data"].map(el => Object.values(el));
+
+    //logger.debug("converted xml to json >>> ", json.keys);
     if(json.keys.length === 0){
       logger.error(json.data + wardNo);
       return ;
     }
-    let csv = await convertToCSV(json.keys, json.data);
-    logger.debug("converted json to csv >>> ");
-    return await writeToFile(wardNo, csv);
-    
+    //let csv = await convertToCSV(json.keys, json.data);
+    //logger.debug("converted json to csv >>> ");
+    //return await writeToFile(wardNo, csv);
+    return await insertDB(json.keys, answer, wardNo);
   } catch (e) {
      logger.error(`error occurred for ward ${wardNo} `, e);
   }
@@ -101,13 +110,22 @@ function convertToCSV(keys, data) {
   let csv = json2csvParser.parse(data);
   return csv;
 }
-async function writeToFile(wardNo, csv) {
-  await fs.writeFile(`./output/test${wardNo}.csv`, csv, (err) => {
+async function writeToFile(err, wardNo) {
+  await fs.writeFile(`./output/error${wardNo}.txt`, err, (err) => {
     if (err) throw err;
     logger.info(`Data saved! for ward ${wardNo}`);
     logger.info("===============================================================================");
     connection.end();
   }); 
 }
-
-
+function insertDB(keys, values, wardNo ){
+  let sql = `INSERT INTO tblproperty_details (${keys}) VALUES ?`;
+  connection.query(sql, [values], function (err) {
+    if (err) {
+      return writeToFile(err, wardNo)
+    }
+    connection.end();
+    logger.info(`Data successfully inserted for ${wardNo}`);
+    logger.info("===============================================================================");
+  });
+}
