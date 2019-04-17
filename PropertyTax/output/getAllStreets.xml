@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <GetAllStreetsResponse xmlns="http://tempuri.org/">
+      <GetAllStreetsResult>
+        <StreetEntityIndianCST>
+          <BlockNo>4</BlockNo>
+          <StreetNo>60</StreetNo>
+          <StreetName>ಅಂತರಸನಹಳ್ಳಿ </StreetName>
+        </StreetEntityIndianCST>
+        <StreetEntityIndianCST>
+          <BlockNo>4</BlockNo>
+          <StreetNo>61</StreetNo>
+          <StreetName>ಮರಳೇನಹಳ್ಳಿ, </StreetName>
+        </StreetEntityIndianCST>
+        <StreetEntityIndianCST>
+          <BlockNo>4</BlockNo>
+          <StreetNo>62</StreetNo>
+          <StreetName>ಲಿಂಗಾಪುರ</StreetName>
+        </StreetEntityIndianCST>
+        <StreetEntityIndianCST>
+          <BlockNo>4</BlockNo>
+          <StreetNo>63</StreetNo>
+          <StreetName>ಹೊನ್ನೇನಹಳ್ಳಿ ಕಸಬ</StreetName>
+        </StreetEntityIndianCST>
+        <StreetEntityIndianCST>
+          <BlockNo>4</BlockNo>
+          <StreetNo>268</StreetNo>
+          <StreetName>ಪಂಚನಾಥರಾಯರ ಪಾಳ್ಯ </StreetName>
+        </StreetEntityIndianCST>
+        <StreetEntityIndianCST>
+          <BlockNo>4</BlockNo>
+          <StreetNo>312</StreetNo>
+          <StreetName>ರಂಗಾಪುರ </StreetName>
+        </StreetEntityIndianCST>
+        <StreetEntityIndianCST>
+          <BlockNo>4</BlockNo>
+          <StreetNo>328</StreetNo>
+          <StreetName>ಅಂತರಸನಹಳ್ಳಿ ಕೈಗಾರಿಕಾ ಪ್ರದೇಶ</StreetName>
+        </StreetEntityIndianCST>
+        <StreetEntityIndianCST>
+          <BlockNo>4</BlockNo>
+          <StreetNo>347</StreetNo>
+          <StreetName>ಎಸ್.ಎನ್. ಪಾಳ್ಯ</StreetName>
+        </StreetEntityIndianCST>
+        <StreetEntityIndianCST>
+          <BlockNo>4</BlockNo>
+          <StreetNo>359</StreetNo>
+          <StreetName>ಲಕ್ಷ್ಮೀನರಸಿಂಹಸ್ವಾಮಿ ಬಡಾವಣೆ	</StreetName>
+        </StreetEntityIndianCST>
+        <StreetEntityIndianCST>
+          <BlockNo>4</BlockNo>
+          <StreetNo>415</StreetNo>
+          <StreetName>ಬಸವ ನಗರ</StreetName>
+        </StreetEntityIndianCST>
+        <StreetEntityIndianCST>
+          <BlockNo>4</BlockNo>
+          <StreetNo>420</StreetNo>
+          <StreetName>ಬಸವ ನಗರ</StreetName>
+        </StreetEntityIndianCST>
+      </GetAllStreetsResult>
+    </GetAllStreetsResponse>
+  </soap:Body>
+</soap:Envelope>
