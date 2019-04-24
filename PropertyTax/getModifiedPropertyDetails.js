@@ -11,9 +11,9 @@ var config = require('./config/dbconfig.js');
 var connection = mysql.createConnection(config.databaseOptions);
 const url = 'http://103.112.213.209/INDIANCST/indiancst.asmx';
 const headers = {
-    'Content-Length': 'length',
-    'Content-Type': 'text/xml;charset=UTF-8',
-    'soapAction': 'http://tempuri.org/GetModifiedPropertyDetails',
+  'Content-Length': 'length',
+  'Content-Type': 'text/xml;charset=UTF-8',
+  'soapAction': 'http://tempuri.org/GetModifiedPropertyDetails',
 }
 args
   .version('0.1.0')
@@ -35,6 +35,7 @@ if (args.wardNo && isNaN(args.wardNo)) {
     if (err) throw err;
     logger.info("Successfully connected to database...");
     start(args);
+
   });
 }
 async function start(args) {
@@ -62,9 +63,7 @@ async function getMAR19Details(wardNo, fromDate, toDate) {
   //logger.debug("XML parameters >>> ", xml);
   return await makeRequest(wardNo, xml);
 }
-
-
-async function makeRequest(wardNo, xml){
+async function makeRequest(wardNo, xml) {
   try {
     //logger.debug("url >>> ", url);
     //logger.debug("headers >>> ", headers);
@@ -73,10 +72,9 @@ async function makeRequest(wardNo, xml){
     const { response } = await soapRequest(url, headers, xml, 10000000); // Optional timeout parameter(milliseconds)
     //logger.debug("response from api: ", response)
     const { body, statusCode } = response;
-    logger.info("xml response received body >>> ", body)
+    //logger.info("xml response received body >>> ", body)
     let json = await convertXMLToJson(body);
     //var answer = json["data"].map(el => Object.values(el));
-
     //logger.debug("converted xml to json >>> ", json.keys);
     if (json.keys.length === 0) {
       logger.error(json.data + wardNo);
@@ -85,13 +83,16 @@ async function makeRequest(wardNo, xml){
     //let csv = await convertToCSV(json.keys, json.data);
     //logger.debug("converted json to csv >>> ");
     //return await writeToFile(csv, wardNo);
-    return await updateDB(json, wardNo);
+    for (var i = 0; i <= json["data"].length - 1; i++) {
+      await updateDB(json, wardNo, i);
+    }
+    connection.end();
+    return;
   } catch (e) {
     logger.error(`error occurred for ward ${wardNo} `, e);
   }
 }
 function convertXMLToJson(body) {
-
   let toJson = xml2json.toJson(body);
   let obj = JSON.parse(toJson);
   logger.debug("converted xml response to JSON obj >>> ");
@@ -112,29 +113,27 @@ function convertToCSV(keys, data) {
   let csv = json2csvParser.parse(data);
   return csv;
 }
-async function writeToFile(csv, wardNo) {
-  await fs.writeFile(`./output/error${wardNo}.txt`, csv, (err) => {
+async function writeToFile(err, wardNo) {
+  await fs.writeFile(`./output/getModifiedPropertyDetialsWardNo:${wardNo}.txt`, err, (err) => {
     if (err) throw err;
-    logger.info(`Data saved! for ward ${wardNo}`);
+    logger.info(`Error Data saved in file for ward ${wardNo}`);
     logger.info("===============================================================================");
     connection.end();
   });
 }
-function updateDB(values, wardNo) {
-  console.log(">>>>>>>", values["data"]);
-  var queries = '';
-  values["data"].forEach(function (item) {
-    console.log(">>>>>>>", item);
-    //queries += mysql.format("UPDATE tblproperty_details SET users = ? WHERE id = ?; ", item);
+async function updateDB(values, wardNo, i) {
+  var data = values["data"];
+  //console.log(">>>>>>> index ", i);
+  //console.log(">>>>>>> pid ", data[i]["PID"]);
+  let pid = data[i]["PID"];
+  delete data[i]["PID"];
+  await connection.query('update tblproperty_details set ? where ?', [data[i], { PID: pid }], async function (err, result) {
+    if (err) {
+      err["pid"] = pid;
+      return writeToFile(err, wardNo)
+    }
+    logger.info("affectedRows ", result["affectedRows"]);
+    logger.info("===============================================================================");
+    logger.info(`Data successfully updated for ${wardNo} PID no: ${pid}`);
   });
-
-  // connection.query(sql, [values], function (err) {
-  //   if (err) {
-  //     return writeToFile(err, wardNo)
-  //   }
-  //   connection.end();
-  //   logger.info(`Data successfully inserted for ${wardNo}`);
-  //   logger.info("===============================================================================");
-  // });
 }
-

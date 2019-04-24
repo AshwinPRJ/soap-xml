@@ -73,23 +73,23 @@ async function makeRequest(wardNo, xml) {
     const { body, statusCode } = response;
     logger.info("xml response received body >>> ")
     let json = await convertXMLToJson(body);
-    var answer = json["data"].map(el => Object.values(el));
-
+    
     //logger.debug("converted xml to json >>> ", json.keys);
     if(json.keys.length === 0){
-      logger.error(json.data + wardNo);
-      return ;
+      logger.warn(json.data + wardNo);
+      connection.end();
+       return json.data ;
     }
+    var answer = json["data"].map(el => Object.values(el));
     //let csv = await convertToCSV(json.keys, json.data);
     //logger.debug("converted json to csv >>> ");
     //return await writeToFile(wardNo, csv);
     return await insertDB(json.keys, answer, wardNo);
   } catch (e) {
-     logger.error(`error occurred for ward ${wardNo} `, e);
+     logger.warn(`error occurred for ward ${wardNo} `, e);
   }
 }
 function convertXMLToJson(body) {
-
   let toJson = xml2json.toJson(body);
   let obj = JSON.parse(toJson);
   logger.debug("converted xml response to JSON obj >>> ");
@@ -113,16 +113,16 @@ function convertToCSV(keys, data) {
 async function writeToFile(err, wardNo) {
   await fs.writeFile(`./output/error${wardNo}.txt`, err, (err) => {
     if (err) throw err;
-    logger.info(`Data saved! for ward ${wardNo}`);
+    logger.info(`Error Data saved in file for ward ${wardNo}`);
     logger.info("===============================================================================");
     connection.end();
   }); 
 }
 function insertDB(keys, values, wardNo ){
   let sql = `INSERT INTO tblproperty_details (${keys}) VALUES ?`;
-  connection.query(sql, [values], function (err) {
+  connection.query(sql, [values], function (err, result) {
     if (err) {
-      return writeToFile(err, wardNo)
+      return writeToFile(err, wardNo )
     }
     connection.end();
     logger.info(`Data successfully inserted for ${wardNo}`);
