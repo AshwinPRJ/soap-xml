@@ -60,6 +60,7 @@ async function makeRequest(xml) {
     let json = await convertXMLToJson(body);
     if (json.keys.length === 0) {
       logger.error(json.data);
+      connection.end();
       return json.data;
     }
     for (var i = 0; i <= json["data"].length - 1; i++) {

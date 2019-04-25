@@ -73,24 +73,34 @@ async function getMAR19Details(wardNo, fromDate, toDate, fromPID, toPID) {
 }
 async function makeRequest(wardNo, xml) {
   try {
-    //logger.info("xml request sent >>> ")
+    logger.info("xml request sent >>> ")
     const { response } = await soapRequest(url, headers, xml, 1000000); // Optional timeout parameter(milliseconds)
     const { body, statusCode } = response;
-    //logger.debug("response from api: ", body)
+    logger.debug("response from api: ", body)
     let json = await convertXMLToJson(body);
-    //logger.debug("converted to json: ", json);
-    var floor = json["floor"].map(el => Object.values(el));
+    logger.debug("converted to json: ", json);
+    if (json.sasList.length === 0) {
+      logger.error("data not found");
+      connection.end();
+      return "data not found";
+    }
+    var floor = "";
+    var floorFeilds = "";
+    if (json["floor"].length != 0){
+      floor = json["floor"].map(el => Object.values(el));
+      floorFeilds = Object.keys(json["floor"][0]);
+    }
     var sasDetails = json["sasList"].map(el => Object.values(el));
+    var sasTableFileds = Object.keys(json["sasList"][0]);
     //logger.debug("converted to floor: ", floor);
     //logger.debug("converted to sasDetails: ", sasDetails);
-    const floorFeilds = Object.keys(json["floor"][0]);
-    const sasTableFileds = Object.keys(json["sasList"][0]);
     //logger.debug("converted to sasTableFileds: ", sasTableFileds);
     //logger.debug("converted to floorFeilds: ", floorFeilds);
     let key = { "floorFeilds": floorFeilds, "sasTableFileds": sasTableFileds };
     let data = { "floor": floor, "sasDetails": sasDetails };
     return await insertDB(key, data, wardNo);
   } catch (e) {
+    connection.end();
     return logger.error(`error occurred for ward ${wardNo} `, e);
   }
 }
@@ -100,6 +110,9 @@ function convertXMLToJson(body) {
   let toJson = xml2json.toJson(body);
   let obj = JSON.parse(toJson);
   logger.debug("converted xml response to JSON obj >>> ");
+  if (obj["soap:Envelope"]["soap:Body"]["GetSASTaxDetailsResponse"]["GetSASTaxDetailsResult"] == undefined || obj["soap:Envelope"]["soap:Body"]["GetSASTaxDetailsResponse"]["GetSASTaxDetailsResult"]["SASEntityIndialCST"] == undefined ) {
+    return { "floor": [], "sasList": [] }
+  }
   var result = obj["soap:Envelope"]["soap:Body"]["GetSASTaxDetailsResponse"]["GetSASTaxDetailsResult"]["SASEntityIndialCST"];
   console.log("result : ", result);
   result.map(function floar(value, index) {
@@ -124,7 +137,7 @@ function convertXMLToJson(body) {
   return table;
 }
 async function insertDB(keys, values, wardNo) {
-  logger.debug("converted to keys: ", keys);
+  logger.debug("converted to keys: ", keys["floorFeilds"]);
   logger.debug("converted to values: ", values);
   let sasMaster = `INSERT INTO tblsas_master_details (${keys["sasTableFileds"]}) VALUES ?`;
   let sasFloor = `INSERT INTO tblsas_floor_details (${keys["floorFeilds"]}) VALUES ?`;
@@ -136,16 +149,18 @@ async function insertDB(keys, values, wardNo) {
     }
     logger.info("affectedRows in sas master table:  ", result["affectedRows"]);
     logger.info(`SAS Master Data successfully inserted for ward no: ${wardNo}`);
-    await connection.query(sasFloor, [values["floor"]], async function (err, result1) {
-      if (err) {
-        logger.error("error occured during inserting ", err);
-        return writeToFile(err, wardNo)
-      }
-      logger.info("affectedRows in floor table: ", result1["affectedRows"]);
-      logger.info("===============================================================================");
-      logger.info(`SAS Floor Data successfully inserted for ward no: ${wardNo}`);
-      connection.end();
-    });
+    if (keys["floorFeilds"] != ""){
+      await connection.query(sasFloor, [values["floor"]], async function (err, result1) {
+        if (err) {
+          logger.error("error occured during inserting ", err);
+          return writeToFile(err, wardNo)
+        }
+        logger.info("affectedRows in floor table: ", result1["affectedRows"]);
+        logger.info("===============================================================================");
+        logger.info(`SAS Floor Data successfully inserted for ward no: ${wardNo}`);
+      });
+    }
+    connection.end();
   });
 }
 async function writeToFile(err, wardNo) {
