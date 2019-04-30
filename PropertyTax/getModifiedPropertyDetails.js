@@ -9,7 +9,7 @@ var mysql = require('mysql');
 logger.level = 'debug';
 var config = require('./config/dbconfig.js');
 var connection = mysql.createConnection(config.databaseOptions);
-const url = 'http://103.112.213.209/INDIANCST/indiancst.asmx';
+const url = 'http://117.239.141.230/eoasis/indiancst.asmx';
 const headers = {
   'Content-Length': 'length',
   'Content-Type': 'text/xml;charset=UTF-8',
@@ -21,23 +21,18 @@ args
   .option('-t, --toDate <>', 'to date')
   .parse(process.argv);
 // Ensure we get minimum required arguments
-if (args.fromDate == undefined && args.toDate == undefined) {
+if (args.fromDate == undefined) {
   args.help();
   process.exit(1);
 } else {
-  connection.connect(function (err) {
-    if (err) throw err;
-    logger.info("Successfully connected to database...");
-    start(args);
-
-  });
+  start(args);
 }
 async function start(args) {
   let fromDate = "", toDate = "";
   if (args.fromDate) fromDate = args.fromDate;
   if (args.toDate) toDate = args.toDate;
-  logger.info("from date >>> ", fromDate);
-  logger.info("to date >>> ", toDate);
+  logger.info("from date  ", fromDate);
+  logger.info("to date  ", toDate);
   return await getMAR19Details(fromDate, toDate);
 }
 async function getMAR19Details(fromDate, toDate) {
@@ -53,32 +48,39 @@ async function getMAR19Details(fromDate, toDate) {
 }
 async function makeRequest(xml) {
   try {
-    logger.info("xml request sent >>> ", xml)
+    //logger.info("xml request sent ", xml)
+    logger.info(`xml request sent `)
     const { response } = await soapRequest(url, headers, xml, 10000000); // Optional timeout parameter(milliseconds)
     const { body, statusCode } = response;
-    logger.info("xml response received body >>> ", body);
+    logger.info("xml response received body ");
     let json = await convertXMLToJson(body);
     if (json.keys.length === 0) {
-      logger.error(json.data);
-      connection.end();
-      return json.data;
+      logger.error("Data not found ",json.data);
+      return "Data not found ";
     }
-    for (var i = 0; i <= json["data"].length - 1; i++) {
-      await updateDB(json, i);
-    }
-    connection.end();
-    return;
+    logger.debug("converted xml response to JSON obj");
+    await connection.connect(async function (err) {
+      if (err) throw err;
+      logger.info("Successfully connected to database...");
+      await ( async ()=>{
+        for (var i = 0; i <= json["data"].length-1; i++) {
+          await updateDB(json, i);
+        }        
+      })()
+      await connection.end();
+    });
+    return "Data successfully updated ";
   } catch (e) {
     logger.error(`error occurred `, e);
-    connection.end();
+    await writeToFile(e);
   }
 }
 function convertXMLToJson(body) {
   let toJson = xml2json.toJson(body);
   let obj = JSON.parse(toJson);
-  logger.debug("converted xml response to JSON obj >>> ");
-  if (obj["soap:Envelope"]["soap:Body"]["GetModifiedPropertyDetailsResponse"]["GetModifiedPropertyDetailsResult"]["MAR19EntityIndianCST"] == undefined || obj["soap:Envelope"]["soap:Body"]["GetModifiedPropertyDetailsResponse"] == undefined) {
-    return { "keys": [], "data": "data not found " }
+  //logger.debug(`json object ${JSON.stringify(obj)}` );
+  if (obj["soap:Envelope"]["soap:Body"]["GetModifiedPropertyDetailsResponse"]["GetModifiedPropertyDetailsResult"]== undefined ) {
+    return { "keys": [], "data": [] }
   }
   let result = obj["soap:Envelope"]["soap:Body"]["GetModifiedPropertyDetailsResponse"]["GetModifiedPropertyDetailsResult"]["MAR19EntityIndianCST"];
   if (!result.length) result = [result];
@@ -94,18 +96,15 @@ async function writeToFile(err) {
   await fs.writeFile(`./output/getModifiedPropertyDetialsWardNo.txt`, err, (err) => {
     if (err) throw err;
     logger.info(`Error Data saved in file `);
-    logger.info("===============================================================================");
-    connection.end();
   });
 }
 async function updateDB(values, i) {
   var data = values["data"];
   let pid = data[i]["PID"];
-  console.log(i)
   await connection.query('update tblproperty_details set ? where ?', [data[i], { PID: pid }], async function (err, result) {
     if (err) {
       err["pid"] = pid;
-      return writeToFile(err);
+      return await writeToFile(err);
     }
     logger.info("affectedRows ", result["affectedRows"]);
     logger.info(`Data successfully updated for PID no: ${pid}`);
