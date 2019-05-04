@@ -11,7 +11,7 @@ const config = require('./config/dbconfig.js');
 const connection = mysql.createConnection(config.databaseOptions);
 const url = 'http://117.239.141.230/eoasis/indiancst.asmx';
 let api = 'GetMar19Details';
-let wardNo="", fromDate="", toDate="";
+let wardNo = "", fromDate = "", toDate = "";
 const headers = {
   'Content-Length': 'length',
   'Content-Type': 'text/xml;charset=UTF-8',
@@ -23,55 +23,63 @@ args
   .option('-f, --fromDate []', 'from date')
   .option('-t, --toDate []', 'to date')
   .parse(process.argv);
-// Ensure we get minimum required arguments
-// if (args.wardNo == undefined) {
-//   args.help();
-//   process.exit(1);
-// }
-// if (args.wardNo && isNaN(args.wardNo)) {
-//   console.error("wardNo should be a number.");
-//   process.exit(1);
-// } else { 
-//   args.wardNo = Number(args.wardNo); 
-// }
 
-(async function () {
-  if (args.wardNo == undefined) {
-    await getLastParams();
-    for (var i = 1; i <= 35; i++) {
-      await getMAR19Details(i, fromDate, toDate);
-    }
-  } else {
-    await start(args);
+connection.connect(async function (err) {
+  if (err) {
+    await writeToFile(err, wardNo, fromDate, toDate);
+    killTheProcess(err);
   }
-  await insertParam();
-}());
-
-
-
-
-async function getLastParams(){
-  await connection.connect(async function (err) {
-    if (err) {
-      return await writeToFile(err);
+  logger.info("Successfully connected to database...");
+  (function () {
+    if (args.wardNo == undefined) {
+      const response = getLastParams();
+    } else {
+      start(args);
     }
-    logger.info("Successfully connected to database...");
-    let sql = `SELECT * FROM tblcorn_params where api = "GetMar19Details" ORDER BY SNo DESC LIMIT 1`;
+  }());
+
+});
+
+
+
+
+function killTheProcess(err) {
+  writeToFile(err, wardNo, fromDate, toDate);
+  connection.end();
+  logger.info("ERROR: ", err);
+  logger.info("KILLING THE PROCESS");
+  process.exit(22);
+}
+
+async function getLastParams() {
+  let sql = `SELECT * FROM tblcorn_params where api = "GetMar19Details" ORDER BY SNo DESC LIMIT 1`;
+  try {
     await connection.query(sql, async function (err, result) {
       if (err) {
-        await writeToFile(err);
-        return await connection.end();
+        killTheProcess(err);
       }
       logger.info(`got last requested params `, JSON.stringify(result));
-      console.log("from date ",result[0]["from_date"]);
-      console.log("to date ",result[0]["to_date"]);
+      if (!result[0]["from_date"] || !result[0]["to_date"]) {
+        logger.info(`\nFrom_date (or) To_date (or) Ward_no in null in DB.\n -----Please check your DB data-----`);
+        killTheProcess('From_date (or) To_date (or) Ward_no in null in DB.\n -----Please check your DB data-----');
+      }
       fromDate = await getFormattedDate(result[0]["to_date"]);
       let oneDown = new Date();
       oneDown.setDate(oneDown.getDate() - 1);
       toDate = await getFormattedDate(oneDown);
-      return await connection.end();
+      for (var i = 1; i <= 35; i++) {
+        await getMAR19Details(i, fromDate, toDate);
+        if (i == 35) {
+          await insertParam()
+          connection.end();
+        }
+
+      }
     });
-  });
+  } catch (error) {
+    logger.error("error occure while getting 'from-date and to-date from DB\n");
+    killTheProcess(err);
+  }
 };
 
 function getFormattedDate(date) {
@@ -79,9 +87,10 @@ function getFormattedDate(date) {
   let month = (1 + date.getMonth()).toString().padStart(2, '0');
   let day = date.getDate().toString().padStart(2, '0');
   var formate = month + "/" + day + "/" + year;
-  console.log("formated in MM/DD/YYY", formate);
+  logger.info("formated in MM/DD/YYY", formate);
   return month + '/' + day + '/' + year;
 }
+
 async function start(args) {
   if (args.wardNo) wardNo = args.wardNo;
   if (args.fromDate) fromDate = args.fromDate;
@@ -89,7 +98,9 @@ async function start(args) {
   logger.info("Ward No: ", wardNo);
   logger.info("From Date: ", fromDate);
   logger.info("To Date: ", toDate);
-  return await getMAR19Details(wardNo, fromDate, toDate);
+  await getMAR19Details(wardNo, fromDate, toDate);
+  connection.end();
+
 }
 async function getMAR19Details(wardNo, fromDate, toDate) {
   const xml = `<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -109,78 +120,66 @@ async function makeRequest(wardNo, xml) {
     const { response } = await soapRequest(url, headers, xml, 10000000); // 2.7 hrs Optional timeout parameter(milliseconds)
     const { body, statusCode } = response;
     logger.debug(`xml response received for ward no ${wardNo}`);
-    //await writeToFile(body);
     let json = await convertXMLToJson(body);
-    if(json.keys.length === 0){
+    if (json.keys.length === 0) {
       logger.warn(`Data not found for ward no ${wardNo}`);
       return `Data not found for ward no ${wardNo}`;
     }
     logger.debug("converted xml to json object ");
-    //let csv = await convertToCSV(json.keys, json.data)
-    //logger.debug("storing csv data in file", csv);
     let values = json["data"].map(el => Object.values(el));
     return await insertDB(json.keys, values, wardNo);
-    //return await writeToFile(csv);
   } catch (e) {
-     logger.warn(`Exception occurred for ward No: ${wardNo} `, e);
-     await writeToFile(e, wardNo);
+    logger.warn(`Exception occurred for ward No: ${wardNo} `, e);
+    await writeToFile(e, wardNo, fromDate, toDate);
   }
 }
 function convertXMLToJson(body) {
   let toJson = xml2json.toJson(body);
   let obj = JSON.parse(toJson);
-  if (obj["soap:Envelope"]["soap:Body"]["GetMar19DetailsResponse"]["GetMar19DetailsResult"] == undefined){
+  if (obj["soap:Envelope"]["soap:Body"]["GetMar19DetailsResponse"]["GetMar19DetailsResult"] == undefined) {
     logger.debug(`data not found`);
     return { "keys": [], "data": [] }
   }
   let result = obj["soap:Envelope"]["soap:Body"]["GetMar19DetailsResponse"]["GetMar19DetailsResult"]["MAR19EntityIndianCST"];
-  if(!result.length) result = [result];
+  if (!result.length) result = [result];
   let fields = Object.keys(result[0]);
-  return {"keys": fields, "data": result}
+  return { "keys": fields, "data": result }
 }
 
-async function writeToFile(err, wardNo) {
-  await fs.writeFile(`./output/getMar19Details${wardNo}.txt`, err, (err) => {
+async function writeToFile(error, ward_no = '', from_date = '', to_date = '') {
+  const message = { ward_no, from_date, to_date, error }
+  await fs.writeFile(`./output/getMar19Details.txt`, message, (err) => {
     if (err) throw err;
     logger.info(`Error data saved in file...`);
-  }); 
+  });
 }
 async function insertDB(keys, values, wardNo) {
-  await connection.connect(async function (err) {
-    if (err) {
-     return await writeToFile(err, wardNo);
-    }
-    logger.info("Successfully connected to database...");
-    let sql = `INSERT INTO tblproperty_details (${keys}) VALUES ?`;
-    logger.info(`Data inserting into tblproperty_details table `);
+  let sql = `INSERT INTO tblproperty_details (${keys}) VALUES ?`;
+  try {
     await connection.query(sql, [values], async function (err, result) {
       if (err) {
-        await writeToFile(err, wardNo);
-        return await connection.end();
+        await writeToFile(err, wardNo, fromDate, toDate);
+        return;
       }
-      logger.info(`No of rows affected ${result["affectedRows"]}`);
-      logger.info(`Data successfully inserted for ${wardNo}`); 
+      logger.info(`Data successfully inserted for ${wardNo}`);
       logger.info("===============================================================================");
-      
-      return await connection.end();
+      return;
     });
-  });
+  } catch (error) {
+    logger.info(`Error occured while insering data of ward No. ${wardNo}. \n ErrorMsg: `, error);
+    await writeToFile(err, wardNo, fromDate, toDate);
+    return;
+  }
 }
-async function insertParam(){
-  console.log(api, fromDate, toDate);
+
+async function insertParam() {
   var post = { api: api };
-  if(fromDate != "") post.from_date = new Date(fromDate);
-  if(toDate != "") post.to_date = new Date(toDate);
+  if (fromDate != "") post.from_date = new Date(fromDate);
+  if (toDate != "") post.to_date = new Date(toDate);
+  console.log("post: ", post)
   var query = connection.query('INSERT INTO tblcorn_params SET ?', post, function (error, results, fields) {
     if (error) throw error;
-    console.log("results ",results);
-    console.log("fields ", fields);
   });
-  console.log(query.sql); 
-return "successfully insert the params "
-}
-function convertToCSV(keys, data) {
-  let json2csvParser = new json2csv({ keys });
-  let csv = json2csvParser.parse(data);
-  return csv;
+  console.log(query.sql);
+  return "successfully insert the params "
 }
