@@ -13,7 +13,7 @@ const url = 'http://117.239.141.230/eoasis/indiancst.asmx';
 const headers = {
   'Content-Length': 'length',
   'Content-Type': 'text/xml;charset=UTF-8',
-  'soapAction': 'http://tempuri.org/GetSASTaxDetails',
+  'soapAction': 'http://insertDBtempuri.org/GetSASTaxDetails',
 };
 args
   .version('0.1.0')
@@ -135,7 +135,7 @@ async function insertDB(keys, values, wardNo) {
     await connection.query(sasMaster, [values["sasDetails"]], async function (err, result) {
       if (err) {
         logger.error("error occured during inserting ", err);
-        return writeToFile(err, wardNo);
+        return await writeToFile(err, wardNo);
       }
       logger.info("affectedRows in sas master table:  ", result["affectedRows"]);
       logger.info(`SAS Master Data successfully inserted for ward no: ${wardNo}`);
@@ -143,7 +143,8 @@ async function insertDB(keys, values, wardNo) {
         await connection.query(sasFloor, [values["floor"]], async function (err, result1) {
           if (err) {
             logger.error("error occured during inserting ", err);
-            return writeToFile(err, wardNo)
+            await connection.end();
+            return await writeToFile(err, wardNo)
           }
           logger.info("affectedRows in floor table: ", result1["affectedRows"]);
           logger.info(`SAS Floor Data successfully inserted for ward no: ${wardNo}`);
@@ -159,6 +160,5 @@ async function writeToFile(err, wardNo) {
       if (err) throw err;
       logger.info(`Error Data saved in file for ward ${wardNo}`);
       logger.info("===============================================================================");
-      connection.end();
     });
 }

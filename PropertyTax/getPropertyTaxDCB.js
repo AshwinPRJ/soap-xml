@@ -68,7 +68,7 @@ async function makeRequest(wardNo, xml) {
     logger.info("Request sent ")
     const { response } = await soapRequest(url, headers, xml, 10000000); // Optional timeout parameter(milliseconds)
     const { body, statusCode } = response;
-    logger.info("xml response received ", body);
+    logger.info("xml response received ");
     let json = await convertXMLToJson(body);
     logger.debug("converted xml to json ");
     if (json.keys.length === 0) {

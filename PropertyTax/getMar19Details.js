@@ -10,6 +10,8 @@ logger.level = 'debug';
 const config = require('./config/dbconfig.js');
 const connection = mysql.createConnection(config.databaseOptions);
 const url = 'http://117.239.141.230/eoasis/indiancst.asmx';
+let api = 'GetMar19Details';
+let wardNo="", fromDate="", toDate="";
 const headers = {
   'Content-Length': 'length',
   'Content-Type': 'text/xml;charset=UTF-8',
@@ -17,24 +19,70 @@ const headers = {
 };
 args
   .version('0.1.0')
-  .option('-w, --wardNo <>', 'Ward No')
+  .option('-w, --wardNo []', 'Ward No')
   .option('-f, --fromDate []', 'from date')
   .option('-t, --toDate []', 'to date')
   .parse(process.argv);
 // Ensure we get minimum required arguments
-if (args.wardNo == undefined) {
-  args.help();
-  process.exit(1);
-}
-if (args.wardNo && isNaN(args.wardNo)) {
-  console.error("wardNo should be a number.");
-  process.exit(1);
-} else { 
-  args.wardNo = Number(args.wardNo); 
-  start(args);
+// if (args.wardNo == undefined) {
+//   args.help();
+//   process.exit(1);
+// }
+// if (args.wardNo && isNaN(args.wardNo)) {
+//   console.error("wardNo should be a number.");
+//   process.exit(1);
+// } else { 
+//   args.wardNo = Number(args.wardNo); 
+// }
+
+(async function () {
+  if (args.wardNo == undefined) {
+    await getLastParams();
+    for (var i = 1; i <= 35; i++) {
+      await getMAR19Details(i, fromDate, toDate);
+    }
+  } else {
+    await start(args);
+  }
+  await insertParam();
+}());
+
+
+
+
+async function getLastParams(){
+  await connection.connect(async function (err) {
+    if (err) {
+      return await writeToFile(err);
+    }
+    logger.info("Successfully connected to database...");
+    let sql = `SELECT * FROM tblcorn_params where api = "GetMar19Details" ORDER BY SNo DESC LIMIT 1`;
+    await connection.query(sql, async function (err, result) {
+      if (err) {
+        await writeToFile(err);
+        return await connection.end();
+      }
+      logger.info(`got last requested params `, JSON.stringify(result));
+      console.log("from date ",result[0]["from_date"]);
+      console.log("to date ",result[0]["to_date"]);
+      fromDate = await getFormattedDate(result[0]["to_date"]);
+      let oneDown = new Date();
+      oneDown.setDate(oneDown.getDate() - 1);
+      toDate = await getFormattedDate(oneDown);
+      return await connection.end();
+    });
+  });
+};
+
+function getFormattedDate(date) {
+  let year = date.getFullYear();
+  let month = (1 + date.getMonth()).toString().padStart(2, '0');
+  let day = date.getDate().toString().padStart(2, '0');
+  var formate = month + "/" + day + "/" + year;
+  console.log("formated in MM/DD/YYY", formate);
+  return month + '/' + day + '/' + year;
 }
 async function start(args) {
-  let wardNo="", fromDate="", toDate="";
   if (args.wardNo) wardNo = args.wardNo;
   if (args.fromDate) fromDate = args.fromDate;
   if (args.toDate) toDate = args.toDate;
@@ -90,11 +138,11 @@ function convertXMLToJson(body) {
   let fields = Object.keys(result[0]);
   return {"keys": fields, "data": result}
 }
+
 async function writeToFile(err, wardNo) {
   await fs.writeFile(`./output/getMar19Details${wardNo}.txt`, err, (err) => {
     if (err) throw err;
     logger.info(`Error data saved in file...`);
-    logger.info("===============================================================================");
   }); 
 }
 async function insertDB(keys, values, wardNo) {
@@ -113,9 +161,23 @@ async function insertDB(keys, values, wardNo) {
       logger.info(`No of rows affected ${result["affectedRows"]}`);
       logger.info(`Data successfully inserted for ${wardNo}`); 
       logger.info("===============================================================================");
+      
       return await connection.end();
     });
   });
+}
+async function insertParam(){
+  console.log(api, fromDate, toDate);
+  var post = { api: api };
+  if(fromDate != "") post.from_date = new Date(fromDate);
+  if(toDate != "") post.to_date = new Date(toDate);
+  var query = connection.query('INSERT INTO tblcorn_params SET ?', post, function (error, results, fields) {
+    if (error) throw error;
+    console.log("results ",results);
+    console.log("fields ", fields);
+  });
+  console.log(query.sql); 
+return "successfully insert the params "
 }
 function convertToCSV(keys, data) {
   let json2csvParser = new json2csv({ keys });

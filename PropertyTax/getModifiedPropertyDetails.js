@@ -10,6 +10,8 @@ logger.level = 'debug';
 var config = require('./config/dbconfig.js');
 var connection = mysql.createConnection(config.databaseOptions);
 const url = 'http://117.239.141.230/eoasis/indiancst.asmx';
+const api = 'GetModifiedPropertyDetails';
+let fromDate = "", toDate = "";
 const headers = {
   'Content-Length': 'length',
   'Content-Type': 'text/xml;charset=UTF-8',
@@ -27,8 +29,25 @@ if (args.fromDate == undefined) {
 } else {
   start(args);
 }
+async function getLastParam() {
+  await connection.connect(async function (err) {
+    if (err) {
+      return await writeToFile(err);
+    }
+    logger.info("Successfully connected to database...");
+    let sql = `SELECT * FROM tblcorn_params where api = "GetMar19Details" ORDER BY SNo DESC LIMIT 1`;
+    await connection.query(sql, async function (err, result) {
+      if (err) {
+        await writeToFile(err);
+        return await connection.end();
+      }
+      logger.info(`got last inserted params `, JSON.stringify(result));
+      wardNo = result[0]["ward_no"]
+      return await connection.end();
+    });
+  });
+}
 async function start(args) {
-  let fromDate = "", toDate = "";
   if (args.fromDate) fromDate = args.fromDate;
   if (args.toDate) toDate = args.toDate;
   logger.info("from date  ", fromDate);
@@ -67,6 +86,7 @@ async function makeRequest(xml) {
           await updateDB(json, i);
         }        
       })()
+      await insertParam();
       await connection.end();
     });
     return "Data successfully updated ";
@@ -108,7 +128,20 @@ async function updateDB(values, i) {
     }
     logger.info("affectedRows ", result["affectedRows"]);
     logger.info(`Data successfully updated for PID no: ${pid}`);
+    
     logger.info("===============================================================================");
     return `Data successfully updated for PID no: ${pid}`;
   });
+}
+async function insertParam() {
+  console.log(api, fromDate, toDate);
+  var post = { api: api };
+  if (fromDate != "") post.from_date = new Date(fromDate);
+  if (toDate != "") post.to_date = new Date(toDate);
+  await connection.query('INSERT INTO tblcorn_params SET ?', post, function (error, results, fields) {
+    if (error) throw error;
+    console.log("results ", results);
+    console.log("fields ", fields);
+  });
+  return "successfully insert the params "
 }
