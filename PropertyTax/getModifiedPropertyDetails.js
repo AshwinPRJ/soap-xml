@@ -19,42 +19,79 @@ const headers = {
 }
 args
   .version('0.1.0')
-  .option('-f, --fromDate <>', 'from date')
-  .option('-t, --toDate <>', 'to date')
+  .option('-f, --fromDate []', 'from date')
+  .option('-t, --toDate []', 'to date')
   .parse(process.argv);
-// Ensure we get minimum required arguments
-if (args.fromDate == undefined) {
-  args.help();
-  process.exit(1);
-} else {
-  start(args);
+
+function killTheProcess(err) {
+  writeToFile(err, fromDate, toDate);
+  connection.end();
+  logger.info("ERROR: ", err);
+  logger.info("KILLING THE PROCESS");
+  process.exit(22);
 }
-async function getLastParam() {
-  await connection.connect(async function (err) {
-    if (err) {
-      return await writeToFile(err);
+
+connection.connect(async function (err) {
+  if (err) {
+    await writeToFile(err, fromDate, toDate);
+    killTheProcess(err);
+  }
+  logger.info("Successfully connected to database...");
+  (function () {
+    if (args.fromDate == undefined) {
+      const response = getLastParams();
+    } else {
+      start(args);
     }
-    logger.info("Successfully connected to database...");
-    let sql = `SELECT * FROM tblcorn_params where api = "GetMar19Details" ORDER BY SNo DESC LIMIT 1`;
+  }());
+});
+
+async function getLastParams() {
+
+  let sql = `SELECT * FROM tblcorn_params where api = ${api} ORDER BY SNo DESC LIMIT 1`;
+  try {
     await connection.query(sql, async function (err, result) {
       if (err) {
-        await writeToFile(err);
-        return await connection.end();
+        killTheProcess(err);
       }
-      logger.info(`got last inserted params `, JSON.stringify(result));
-      wardNo = result[0]["ward_no"]
-      return await connection.end();
+      logger.info(`got last requested params `, JSON.stringify(result));
+      if (!result[0]["from_date"] || !result[0]["to_date"]) {
+        logger.info(`\nFrom_date (or) To_date in null in DB.\n -----Please check your DB data-----`);
+        killTheProcess('From_date (or) To_date in null in DB.\n -----Please check your DB data-----');
+      }
+      fromDate = await getFormattedDate(result[0]["to_date"]);
+      let oneDown = new Date();
+      oneDown.setDate(oneDown.getDate() - 1);
+      toDate = await getFormattedDate(oneDown);
+      await getModifiedPropertyDetails(fromDate, toDate);
+      await insertParam();
+      connection.end();
     });
-  });
+  } catch (error) {
+    logger.error("error occure while getting 'from-date and to-date from DB\n");
+    killTheProcess(err);
+  }
+};
+
+function getFormattedDate(date) {
+  let year = date.getFullYear();
+  let month = (1 + date.getMonth()).toString().padStart(2, '0');
+  let day = date.getDate().toString().padStart(2, '0');
+  var formate = month + "/" + day + "/" + year;
+  logger.info("formated in MM/DD/YYY", formate);
+  return month + '/' + day + '/' + year;
 }
+
 async function start(args) {
   if (args.fromDate) fromDate = args.fromDate;
   if (args.toDate) toDate = args.toDate;
-  logger.info("from date  ", fromDate);
-  logger.info("to date  ", toDate);
-  return await getMAR19Details(fromDate, toDate);
+  logger.info("From Date: ", fromDate);
+  logger.info("To Date: ", toDate);
+  await getModifiedPropertyDetails(fromDate, toDate);
+  connection.end();
 }
-async function getMAR19Details(fromDate, toDate) {
+
+async function getModifiedPropertyDetails(fromDate, toDate) {
   const xml = `<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
       			  <soap:Body>
       			    <GetModifiedPropertyDetails xmlns="http://tempuri.org/">
@@ -65,40 +102,34 @@ async function getMAR19Details(fromDate, toDate) {
             </soap:Envelope>`;
   return await makeRequest(xml);
 }
+
 async function makeRequest(xml) {
   try {
-    //logger.info("xml request sent ", xml)
     logger.info(`xml request sent `)
     const { response } = await soapRequest(url, headers, xml, 10000000); // Optional timeout parameter(milliseconds)
     const { body, statusCode } = response;
     logger.info("xml response received body ");
     let json = await convertXMLToJson(body);
     if (json.keys.length === 0) {
-      logger.error("Data not found ",json.data);
+      logger.error("Data not found ", json.data);
       return "Data not found ";
     }
     logger.debug("converted xml response to JSON obj");
-    await connection.connect(async function (err) {
-      if (err) throw err;
-      logger.info("Successfully connected to database...");
-      await ( async ()=>{
-        for (var i = 0; i <= json["data"].length-1; i++) {
-          await updateDB(json, i);
-        }        
-      })()
-      await insertParam();
-      await connection.end();
-    });
+    await (async () => {
+      for (var i = 0; i <= json["data"].length - 1; i++) {
+        await updateDB(json, i);
+      }
+    })();
     return "Data successfully updated ";
   } catch (e) {
     logger.error(`error occurred `, e);
-    await writeToFile(e);
+    await writeToFile(e, fromDate, toDate);
   }
 }
+
 function convertXMLToJson(body) {
   let toJson = xml2json.toJson(body);
   let obj = JSON.parse(toJson);
-  //logger.debug(`json object ${JSON.stringify(obj)}` );
   if (obj["soap:Envelope"]["soap:Body"]["GetModifiedPropertyDetailsResponse"]["GetModifiedPropertyDetailsResult"]== undefined ) {
     return { "keys": [], "data": [] }
   }
@@ -107,41 +138,44 @@ function convertXMLToJson(body) {
   let fields = Object.keys(result[0]);
   return { "keys": fields, "data": result }
 }
-function convertToCSV(keys, data) {
-  let json2csvParser = new json2csv({ keys });
-  let csv = json2csvParser.parse(data);
-  return csv;
-}
-async function writeToFile(err) {
-  await fs.writeFile(`./output/getModifiedPropertyDetialsWardNo.txt`, err, (err) => {
-    if (err) throw err;
-    logger.info(`Error Data saved in file `);
-  });
-}
+
 async function updateDB(values, i) {
   var data = values["data"];
   let pid = data[i]["PID"];
-  await connection.query('update tblproperty_details set ? where ?', [data[i], { PID: pid }], async function (err, result) {
-    if (err) {
-      err["pid"] = pid;
-      return await writeToFile(err);
-    }
-    logger.info("affectedRows ", result["affectedRows"]);
-    logger.info(`Data successfully updated for PID no: ${pid}`);
-    
-    logger.info("===============================================================================");
-    return `Data successfully updated for PID no: ${pid}`;
-  });
+  try {
+    await connection.query('update tblproperty_details set ? where ?', [data[i], { PID: pid }], async function (err, result) {
+      if (err) {
+        err["pid"] = pid;
+        return writeToFile(err, fromDate, toDate);
+      }
+      logger.info(`Data successfully updated for PID no: ${pid}`);
+      logger.info("===============================================================================");
+      return `Data successfully updated for PID no: ${pid}`;
+    });
+  } catch (error) {
+    err["pid"] = pid;
+    return writeToFile(err, fromDate, toDate);
+  }
 }
 async function insertParam() {
-  console.log(api, fromDate, toDate);
   var post = { api: api };
   if (fromDate != "") post.from_date = new Date(fromDate);
   if (toDate != "") post.to_date = new Date(toDate);
-  await connection.query('INSERT INTO tblcorn_params SET ?', post, function (error, results, fields) {
-    if (error) throw error;
-    console.log("results ", results);
-    console.log("fields ", fields);
+  console.log("post: ", post)
+  try {
+    var query = connection.query('INSERT INTO tblcorn_params SET ?', post, function (error, results, fields) {
+      if (error) throw error;
+      console.log(query.sql);
+    });
+    return "successfully insert the params "
+  } catch (error) {
+    return writeToFile(error, fromDate, toDate);
+  }
+}
+async function writeToFile(error, from_date = '', to_date = '') {
+  const message = { from_date, to_date, error }
+  await fs.appendFileSync(`./output/getMar19Details.txt`, JSON.stringify(message), (err) => {
+    if (err) throw err;
+    logger.error(`Error data saved in file...`);
   });
-  return "successfully insert the params "
 }

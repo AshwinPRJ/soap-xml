@@ -40,9 +40,6 @@ connection.connect(async function (err) {
 
 });
 
-
-
-
 function killTheProcess(err) {
   writeToFile(err, wardNo, fromDate, toDate);
   connection.end();
@@ -52,7 +49,7 @@ function killTheProcess(err) {
 }
 
 async function getLastParams() {
-  let sql = `SELECT * FROM tblcorn_params where api = "GetMar19Details" ORDER BY SNo DESC LIMIT 1`;
+  let sql = `SELECT * FROM tblcorn_params where api = ${api} ORDER BY SNo DESC LIMIT 1`;
   try {
     await connection.query(sql, async function (err, result) {
       if (err) {
@@ -73,7 +70,6 @@ async function getLastParams() {
           await insertParam()
           connection.end();
         }
-
       }
     });
   } catch (error) {
@@ -129,7 +125,7 @@ async function makeRequest(wardNo, xml) {
     let values = json["data"].map(el => Object.values(el));
     return await insertDB(json.keys, values, wardNo);
   } catch (e) {
-    logger.warn(`Exception occurred for ward No: ${wardNo} `, e);
+    logger.error(`Exception occurred for ward No: ${wardNo} `, e);
     await writeToFile(e, wardNo, fromDate, toDate);
   }
 }
@@ -148,9 +144,9 @@ function convertXMLToJson(body) {
 
 async function writeToFile(error, ward_no = '', from_date = '', to_date = '') {
   const message = { ward_no, from_date, to_date, error }
-  await fs.writeFile(`./output/getMar19Details.txt`, message, (err) => {
+  await fs.appendFileSync(`./output/getMar19Details.txt`, JSON.stringify(message), (err) => {
     if (err) throw err;
-    logger.info(`Error data saved in file...`);
+    logger.error(`Error data saved in file...`);
   });
 }
 async function insertDB(keys, values, wardNo) {
@@ -163,10 +159,10 @@ async function insertDB(keys, values, wardNo) {
       }
       logger.info(`Data successfully inserted for ${wardNo}`);
       logger.info("===============================================================================");
-      return;
+      return true;
     });
   } catch (error) {
-    logger.info(`Error occured while insering data of ward No. ${wardNo}. \n ErrorMsg: `, error);
+    logger.error(`Error occured while insering data of ward No. ${wardNo}. \n ErrorMsg: `, error);
     await writeToFile(err, wardNo, fromDate, toDate);
     return;
   }
