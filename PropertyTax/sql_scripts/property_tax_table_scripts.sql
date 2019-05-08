@@ -120,7 +120,7 @@ CREATE TABLE `tblcorn_params`(
 );
 
 INSERT INTO tblcorn_params (API,  from_date, to_date, from_year, to_year, from_pid, to_pid)
-VALUES ('getMar19Details',  '2002-01-01', '2003-01-01', '2002-03', '2003-04', '1', '1' );
+VALUES ('GetMar19Details',  '2002-01-01', '2003-01-01', '', '', '', '' );
 
-	select * from tblcorn_params;
+        select * from tblcorn_params;
 SELECT * FROM tblcorn_params where api = "GetMar19Details" ORDER BY SNo DESC LIMIT 1
