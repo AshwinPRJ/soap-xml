@@ -48,7 +48,7 @@ connection.connect(async function (err) {
 
 async function getLastParams() {
 
-  let sql = `SELECT * FROM tblcorn_params where api = ${api} ORDER BY SNo DESC LIMIT 1`;
+  let sql = `SELECT * FROM tblcorn_params where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
   try {
     await connection.query(sql, async function (err, result) {
       if (err) {
@@ -174,7 +174,7 @@ async function insertParam() {
 }
 async function writeToFile(error, from_date = '', to_date = '') {
   const message = { from_date, to_date, error }
-  await fs.appendFileSync(`./output/getMar19Details.txt`, JSON.stringify(message), (err) => {
+  await fs.appendFileSync(`./output/getModifiedPropertyDetails.txt`, JSON.stringify(message), (err) => {
     if (err) throw err;
     logger.error(`Error data saved in file...`);
   });

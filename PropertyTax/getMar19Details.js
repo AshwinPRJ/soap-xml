@@ -49,7 +49,7 @@ function killTheProcess(err) {
 }
 
 async function getLastParams() {
-  let sql = `SELECT * FROM tblcorn_params where api = ${api} ORDER BY SNo DESC LIMIT 1`;
+  let sql = `SELECT * FROM tblcorn_params where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
   try {
     await connection.query(sql, async function (err, result) {
       if (err) {
@@ -163,7 +163,7 @@ async function insertDB(keys, values, wardNo) {
     });
   } catch (error) {
     logger.error(`Error occured while insering data of ward No. ${wardNo}. \n ErrorMsg: `, error);
-    await writeToFile(err, wardNo, fromDate, toDate);
+    await writeToFile(error, wardNo, fromDate, toDate);
     return;
   }
 }
@@ -173,9 +173,15 @@ async function insertParam() {
   if (fromDate != "") post.from_date = new Date(fromDate);
   if (toDate != "") post.to_date = new Date(toDate);
   console.log("post: ", post)
-  var query = connection.query('INSERT INTO tblcorn_params SET ?', post, function (error, results, fields) {
-    if (error) throw error;
-  });
+  try{
+    var query = connection.query('INSERT INTO tblcorn_params SET ?', post, function (error, results, fields) {
+      if (error) throw error;
+      return "successfully insert the params "
+    });
+  } catch(e){
+    await writeToFile(e, wardNo, fromDate, toDate);
+    return;
+  }
   console.log(query.sql);
-  return "successfully insert the params "
+  
 }

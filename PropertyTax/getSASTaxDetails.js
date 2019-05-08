@@ -13,11 +13,11 @@ const url = 'http://117.239.141.230/eoasis/indiancst.asmx';
 const headers = {
   'Content-Length': 'length',
   'Content-Type': 'text/xml;charset=UTF-8',
-  'soapAction': 'http://insertDBtempuri.org/GetSASTaxDetails',
+  'SOAPAction': "http://tempuri.org/GetSASTaxDetails",
 };
 args
   .version('0.1.0')
-  .option('-w, --wardNo <>', 'Ward No')
+  .option('-w, --wardNo []', 'Ward No')
   .option('-s, --fromDate []', 'from date')
   .option('-e, --toDate []', 'to date')
   .option('-f, --fromPID []', 'from pid')
@@ -51,7 +51,7 @@ async function start(args) {
 }
 async function getMAR19Details(wardNo, fromDate, toDate, fromPID, toPID) {
   const date = { wardNo, fromDate, toDate, fromPID, toPID }
-  //logger.debug("date : >>", date)
+  logger.debug("date : >>", date)
   const xml = `<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
               <soap:Body>
                 <GetSASTaxDetails xmlns="http://tempuri.org/">
@@ -63,7 +63,7 @@ async function getMAR19Details(wardNo, fromDate, toDate, fromPID, toPID) {
                 </GetSASTaxDetails>
               </soap:Body>
             </soap:Envelope>`;
-  //logger.debug("xml : >>", xml)
+  logger.debug("xml : >>", xml)
   return await makeRequest(wardNo, xml);
 }
 async function makeRequest(wardNo, xml) {
@@ -71,7 +71,7 @@ async function makeRequest(wardNo, xml) {
     logger.info("xml request sent >>> ")
     const { response } = await soapRequest(url, headers, xml, 1000000); // Optional timeout parameter(milliseconds)
     const { body, statusCode } = response;
-    logger.debug("xml response received ")
+    logger.debug("xml response received ", body)
     let json = await convertXMLToJson(body);
     logger.debug("converted to json ");
     if (json.sasList.length === 0) {
