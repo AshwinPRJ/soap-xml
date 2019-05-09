@@ -68,6 +68,7 @@ function getLastParams() {
   } catch (error) {
     logger.error("error occure while getting 'from-date and to-date from DB\n", error);
     killTheProcess(error);
+    return;
   }
 };
 
@@ -122,7 +123,8 @@ async function makeRequest(wardNo, xml) {
     return;
   } catch (e) {
     logger.error(`Exception occurred for ward No: ${wardNo} `, e);
-    writeToFile(e, wardNo, fromDate, toDate);
+    await writeToFile(e, wardNo, fromDate, toDate);
+    return;
   }
 }
 
@@ -140,7 +142,7 @@ function convertXMLToJson(body) {
 }
 
 function writeToFile(error, ward_no = '', from_date = '', to_date = '') {
-  const message = { ward_no, from_date, to_date, error }
+  const message = { ward_no: ward_no, from_date: from_date, to_date: to_date, error: error }
   try {
     fs.appendFile(`./output/getMar19Details.txt`, JSON.stringify(message), function (err) {
       if (err) throw err;
@@ -149,6 +151,7 @@ function writeToFile(error, ward_no = '', from_date = '', to_date = '') {
     });
   } catch (error) {
     logger.error(`error occured while saving to file for ward No: ${wardNo} `, error);
+    return;
   }
 }
 
@@ -182,10 +185,10 @@ function insertParam() {
       if (error) throw error;
       return "successfully insert the params "
     });
+    console.log(query.sql);
   } catch(e){
     logger.error(`Error occured while insering input params. ${wardNo}. \n ErrorMsg: `, e);
     writeToFile(e, wardNo, fromDate, toDate);
     return;
   }
-  console.log(query.sql);
 }
