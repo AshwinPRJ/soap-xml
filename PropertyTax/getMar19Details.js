@@ -24,20 +24,14 @@ args
   .option('-t, --toDate []', 'to date')
   .parse(process.argv);
 
-connection.connect(async function (err) {
-  if (err) {
-    await writeToFile(err, wardNo, fromDate, toDate);
-    killTheProcess(err);
-  }
+connection.connect(function (err) {
+  if (err) killTheProcess(err);
   logger.info("Successfully connected to database...");
-  (function () {
     if (args.wardNo == undefined) {
-      const response = getLastParams();
+      getLastParams();
     } else {
       start(args);
     }
-  }());
-
 });
 
 function killTheProcess(err) {
@@ -48,15 +42,13 @@ function killTheProcess(err) {
   process.exit(22);
 }
 
-async function getLastParams() {
+function getLastParams() {
   let sql = `SELECT * FROM tblcorn_params where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
   try {
-    await connection.query(sql, async function (err, result) {
-      if (err) {
-        killTheProcess(err);
-      }
+    connection.query(sql, async function (err, result) {
+      if (err) killTheProcess(err);
       logger.info(`got last requested params `, JSON.stringify(result));
-      if (!result[0]["from_date"] || !result[0]["to_date"]) {
+      if (result.length == 0 || !result[0]["from_date"] || !result[0]["to_date"]) {
         logger.info(`\nFrom_date (or) To_date (or) Ward_no in null in DB.\n -----Please check your DB data-----`);
         killTheProcess('From_date (or) To_date (or) Ward_no in null in DB.\n -----Please check your DB data-----');
       }
@@ -71,10 +63,11 @@ async function getLastParams() {
           connection.end();
         }
       }
+      return;
     });
   } catch (error) {
-    logger.error("error occure while getting 'from-date and to-date from DB\n");
-    killTheProcess(err);
+    logger.error("error occure while getting 'from-date and to-date from DB\n", error);
+    killTheProcess(error);
   }
 };
 
@@ -96,8 +89,8 @@ async function start(args) {
   logger.info("To Date: ", toDate);
   await getMAR19Details(wardNo, fromDate, toDate);
   connection.end();
-
 }
+
 async function getMAR19Details(wardNo, fromDate, toDate) {
   const xml = `<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
       			  <soap:Body>
@@ -108,36 +101,36 @@ async function getMAR19Details(wardNo, fromDate, toDate) {
       			    </GetMar19Details>
       			  </soap:Body>
             </soap:Envelope>`;
-  return await makeRequest(wardNo, xml);
+  await makeRequest(wardNo, xml);
+  return;
 }
+
 async function makeRequest(wardNo, xml) {
   try {
     logger.info(`xml request sent for ward no ${wardNo}`)
     const { response } = await soapRequest(url, headers, xml, 10000000); // 2.7 hrs Optional timeout parameter(milliseconds)
     const { body, statusCode } = response;
-    logger.debug(`xml response received for ward no ${wardNo}`);
+    logger.info(`xml response received for ward no ${wardNo}`);
     let json = await convertXMLToJson(body);
     if (json.keys.length === 0) {
       logger.warn(`Data not found for ward no ${wardNo}`);
       return `Data not found for ward no ${wardNo}`;
     }
-    logger.debug("converted xml to json object ");
+    logger.info("converted xml to json object ");
     let values = json["data"].map(el => Object.values(el));
-    //logger.debug("values to insert ", values);
-    //logger.debug("json.keys ", json.keys);
-    //logger.debug("wardNo ", wardNo);
     await insertDB(json.keys, values, wardNo);
     return;
   } catch (e) {
     logger.error(`Exception occurred for ward No: ${wardNo} `, e);
-    await writeToFile(e, wardNo, fromDate, toDate);
+    writeToFile(e, wardNo, fromDate, toDate);
   }
 }
+
 function convertXMLToJson(body) {
   let toJson = xml2json.toJson(body);
   let obj = JSON.parse(toJson);
   if (obj["soap:Envelope"]["soap:Body"]["GetMar19DetailsResponse"]["GetMar19DetailsResult"] == undefined) {
-    logger.debug(`data not found`);
+    logger.info(`data not found`);
     return { "keys": [], "data": [] }
   }
   let result = obj["soap:Envelope"]["soap:Body"]["GetMar19DetailsResponse"]["GetMar19DetailsResult"]["MAR19EntityIndianCST"];
@@ -146,37 +139,40 @@ function convertXMLToJson(body) {
   return { "keys": fields, "data": result }
 }
 
-async function writeToFile(error, ward_no = '', from_date = '', to_date = '') {
+function writeToFile(error, ward_no = '', from_date = '', to_date = '') {
   const message = { ward_no, from_date, to_date, error }
-  //logger.info("message", message)
-  await fs.appendFile(`./output/getMar19Details.txt`, JSON.stringify(message), function (err) {
-    if (err) throw err;
-    logger.info(`Error data saved in file...`);
-    return;
-  });
+  try {
+    fs.appendFile(`./output/getMar19Details.txt`, JSON.stringify(message), function (err) {
+      if (err) throw err;
+      logger.info(`Error data saved in file...`);
+      return;
+    });
+  } catch (error) {
+    logger.error(`error occured while saving to file for ward No: ${wardNo} `, error);
+  }
 }
-async function insertDB(keys, values, wardNo) {
+
+function insertDB(keys, values, wardNo) {
   let sql = `INSERT INTO tblproperty_details (${keys}) VALUES ?`;
   try {
     logger.info("inserting into database");
-    await connection.query(sql, [values], async function (err, result) {
+    connection.query(sql, [values], function (err, result) {
       if (err) {
         logger.info(`error occured while inserting data for ward no: ${wardNo}`);
-        await writeToFile(err, wardNo, fromDate, toDate);
+        writeToFile(err, wardNo, fromDate, toDate);
         return;
       }
       logger.info(`Data successfully inserted for ward no: ${wardNo}`);
-      logger.info("===============================================================================");
-      return true;
+      return;
     });
   } catch (error) {
-    logger.error(`Error occured while insering data of ward No. ${wardNo}. \n ErrorMsg: `, error);
-    await writeToFile(error, wardNo, fromDate, toDate);
+    logger.error(`Error occured while insering master data of ward No. ${wardNo}. \n ErrorMsg: `, error);
+    writeToFile(error, wardNo, fromDate, toDate);
     return;
   }
 }
 
-async function insertParam() {
+function insertParam() {
   var post = { api: api };
   if (fromDate != "") post.from_date = new Date(fromDate);
   if (toDate != "") post.to_date = new Date(toDate);
@@ -187,9 +183,9 @@ async function insertParam() {
       return "successfully insert the params "
     });
   } catch(e){
-    await writeToFile(e, wardNo, fromDate, toDate);
+    logger.error(`Error occured while insering input params. ${wardNo}. \n ErrorMsg: `, e);
+    writeToFile(e, wardNo, fromDate, toDate);
     return;
   }
   console.log(query.sql);
-  
 }
