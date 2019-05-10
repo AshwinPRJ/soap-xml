@@ -45,7 +45,7 @@ function killTheProcess(err) {
 }
 
 function getLastParams() {
-    let sql = `SELECT * FROM tblcorn_params where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
+    let sql = `SELECT * FROM tblcron_params where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
     try {
         connection.query(sql, async function(err, result) {
             if (err) killTheProcess(err);
@@ -185,6 +185,7 @@ function insertDB(keys, values, wardNo) {
                 writeToFile(err, wardNo, fromDate, toDate);
                 return;
             }
+            logger.info(`affectedRows for ward no: ${wardNo} : `, result["affectedRows"]);
             logger.info(`Data successfully inserted for ward no: ${wardNo}`);
             return;
         });
@@ -202,8 +203,9 @@ function insertParam() {
     if (fromDate != "") post.from_date = new Date(fromDate);
     if (toDate != "") post.to_date = new Date(toDate);
     try {
-        var query = connection.query('INSERT INTO tblcorn_params SET ?', post, function(error, results, fields) {
+        var query = connection.query('INSERT INTO tblcron_params SET ?', post, function(error, results, fields) {
             if (error) throw error;
+            logger.info(`affectedRows for ward no: ${wardNo} : `, results["affectedRows"]);
             return "successfully insert the params "
         });
         logger.info("inserted param to cron table",query.sql);
