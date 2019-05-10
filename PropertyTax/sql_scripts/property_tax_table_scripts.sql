@@ -2,7 +2,8 @@ drop table tblsas_floor_details;
 drop table tblsas_master_details;
 drop table tblproperty_dcb_details;
 drop table tblproperty_details;
-drop table tblcorn_params;
+drop table tblcron_params;
+
 
 
 CREATE TABLE `tblproperty_details` (
@@ -106,21 +107,24 @@ CREATE TABLE `tblsas_floor_details` (
   FOREIGN KEY (SASID) REFERENCES tblsas_master_details(SASID)
 );
 
-CREATE TABLE `tblcorn_params`(
+CREATE TABLE `tblcron_params`(
   `SNo` int AUTO_INCREMENT,
   `API` varchar(345) CHARACTER SET utf8 DEFAULT NULL,
   `from_date` DATE  DEFAULT NULL,
   `to_date` DATE DEFAULT NULL,
   `from_year` varchar(345) CHARACTER SET utf8 DEFAULT NULL,
   `to_year` varchar(345) CHARACTER SET utf8 DEFAULT NULL,
-  `from_pid` varchar(345) CHARACTER SET utf8 DEFAULT NULL,
-  `to_pid` varchar(345) CHARACTER SET utf8 DEFAULT NULL,
   `last_updated` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY (`SNo`)
 );
 
-INSERT INTO tblcorn_params (API,  from_date, to_date, from_year, to_year, from_pid, to_pid)
-VALUES ('GetMar19Details',  '2002-01-01', '2003-01-01', '', '', '', '' );
 
-        select * from tblcorn_params;
-SELECT * FROM tblcorn_params where api = "GetMar19Details" ORDER BY SNo DESC LIMIT 1
+INSERT INTO tblcron_params (API,  from_date, to_date)
+VALUES ('GetMar19Details',  '2002-01-01', '2002-01-01');
+INSERT INTO tblcron_params (API,  from_date, to_date)
+VALUES ('GetModifiedPropertyDetails',  '2002-01-01', '2002-01-01');
+INSERT INTO tblcron_params (API,  from_year, to_year)
+VALUES ('GetPropertyTaxDCBDetails',  '2017-18', '2017-18');
+INSERT INTO tblcron_params (API,  from_date, to_date)
+VALUES ('GetSASTaxDetails',  '2018-01-01', '2019-01-01');
+select * from tblcron_params;
