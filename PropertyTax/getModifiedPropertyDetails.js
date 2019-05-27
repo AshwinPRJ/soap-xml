@@ -59,13 +59,15 @@ let getLastParams = function () {
             connection.query(sql, async function (err, result) {
                 if (err) {
 					killTheProcess(err);
-					reject({status:false, msg:err});
+                    reject({status:false, msg:err});
+                    return;
 				}
                 logger.info(`got last requested params `, JSON.stringify(result));
                 if (result.length == 0 || !result[0]["from_date"] || !result[0]["to_date"]) {
                     logger.info(`From_date (or) To_date in null in DB.`);
                     killTheProcess('From_date (or) To_date in null in DB.');
                     reject({status:false, msg:'From_date (or) To_date in null in DB'});
+                    return;
                 }
                 let oneUp = result[0]["to_date"];
                 oneUp.setDate(oneUp.getDate() + 1);
@@ -77,11 +79,13 @@ let getLastParams = function () {
                 await insertParam(api, fromDate, toDate);
                 connection.end();
                 resolve({status:true, msg:"Property Update Details successfully inserted"});
+                return;
             });
         } catch (error) {
             logger.error("error occure while getting 'from-date and to-date from DB\n", error);
             killTheProcess(error);
             reject({status:false, msg:error});
+            return;
         }
     });
 };
@@ -138,6 +142,7 @@ async function makeRequest(xml) {
         }
         await BPromise.reduce(master_data, updateToNeo4jDB.add2Graph, log_record)
             .then(function (log_record) {
+                logger.info(`Data successfully updated in Neo4j DB `);
                 db.close();
                 return;
             })
@@ -180,11 +185,13 @@ function updateDB(values, i) {
                 delete err["sql"];
                 //utils.writeToFile(err, '', fromDate, toDate, api);
                 reject(err);
+                return;
             }
 
             logger.info(`affectedRows for from date: ${fromDate} - to date: ${toDate} `, result["affectedRows"]);
             logger.info(`Data successfully updated for PID no: ${pid}`);
             resolve(result);
+            return;
         });
     });
 }
@@ -201,9 +208,11 @@ let insertParam = function (api, fromDate, toDate) {
                 delete error["sql"];
                 //utils.writeToFile(err, '', fromDate, toDate, api);
                 reject(error);
+                return;
             }
             logger.info(`inserted params to cron table `, post);
             resolve(results);
+            return;
         });
     });
 }

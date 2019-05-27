@@ -71,6 +71,7 @@ let getLastParams = function () {
                         status: false,
                         msg: err
                     });
+                    return;
                 }
                 logger.info(`got last requested params `, JSON.stringify(result));
                 if (result.length == 0 || !result[0]["from_year"] || !result[0]["to_year"]) {
@@ -80,6 +81,7 @@ let getLastParams = function () {
                         status: false,
                         msg: 'From_date (or) To_date in null in DB'
                     });
+                    return;
                 }
                 var last2digit = new Date().getFullYear().toString().substr(-2);
                 let current = parseInt(last2digit) + 1;
@@ -96,6 +98,7 @@ let getLastParams = function () {
                     status: true,
                     msg: "DCB Details successfully inserted"
                 });
+                return;
             });
         } catch (error) {
             logger.error("error occure while getting 'from-year and to-year from DB\n", error);
@@ -104,6 +107,7 @@ let getLastParams = function () {
                 status: false,
                 msg: error
             });
+            return;
         }
     });
 };
@@ -167,6 +171,7 @@ async function makeRequest(wardNo, xml) {
 
         await BPromise.reduce(json["data"], addToNeo4jDB.add2Graph, log_record)
             .then(function (log_record) {
+                logger.info(`Data successfully inserted in Neo4j DB for ward no: ${wardNo}`);
                 db.close();
                 return;
             })
@@ -205,10 +210,12 @@ function insertDB(keys, values, wardNo) {
                 delete err["sql"];
                 //utils.writeToFile(err, wardNo, fromYear, toYear, api);
                 reject(err);
+                return;
             }
             logger.info(`affectedRows for ward no: ${wardNo} : `, result["affectedRows"]);
             logger.info(`Data successfully inserted for ward no: ${wardNo}`);
             resolve(result);
+            return;
         });
     });
 }
@@ -226,9 +233,11 @@ function insertParam(api, wardNo, fromYear, toYear) {
                 delete error["sql"];
                 //utils.writeToFile(error, wardNo, fromDate, toDate, api);
                 reject(error);
+                return;
             }
             logger.info(`inserted params to cron table `, post);
             resolve(results);
+            return;
         });
     });
 }

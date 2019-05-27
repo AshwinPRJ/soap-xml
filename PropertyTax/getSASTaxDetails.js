@@ -190,7 +190,7 @@ async function makeRequest(wardNo, xml) {
     stringifyFloors["sasDeatils"][0]["params"] = params;
     await BPromise.reduce(stringifyFloors["sasDeatils"], addToNeo4jDB.add2Graph, log_record)
       .then(function (log_record) {
-        //console.log(log_record);
+        logger.info(`SAS Data successfully inserted for ward no: ${wardNo}`);
         db.close();
         return;
       })

@@ -168,6 +168,7 @@ async function makeRequest(wardNo, xml) {
 		await insertDB(json.keys, values, wardNo);
 		await BPromise.reduce(master_data, addToNeo4jDB.add2Graph, log_record)
 			.then(function (log_record) {
+				logger.info(`Data successfully inserted in Neo4j DB for ward no: ${wardNo}`);
 				db.close();
 				return;
 			})
@@ -191,7 +192,7 @@ function insertDB(keys, values, wardNo) {
 				return;
 			} else {
 				logger.info(`affectedRows for ward no: ${wardNo} : `, result["affectedRows"]);
-				logger.info(`Data successfully inserted for ward no: ${wardNo}`);
+				logger.info(`Data successfully inserted in MySQL for ward no: ${wardNo}`);
 				resolve(result);
 				return;
 			}
