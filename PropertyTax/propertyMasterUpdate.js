@@ -46,7 +46,11 @@ async function add2Graph(acc, jsonData, index) {
         return result;
     } catch (error) {
         console.log("error: ", error);
-        utils.writeToFile(error, wardNo, fromDate, toDate, api);
+        let addPID = {
+            error: error,
+            PID: jsonData["property_master"]["PID"]
+          }
+        utils.writeToFile(addPID, wardNo, fromDate, toDate, api);
         return error;
     }
 }

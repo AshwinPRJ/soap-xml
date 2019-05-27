@@ -37,7 +37,11 @@ async function add2Graph(acc, jsonData, index) {
         return result;
     } catch (error) {
         console.log("error: ", error);
-        utils.writeToFile(error, wardNo, fromYear, toYear, api);
+        let addPID = {
+            error: error,
+            PID: jsonData["PID"]
+          }
+        utils.writeToFile(addPID, wardNo, fromYear, toYear, api);
         return error;
     }
 }

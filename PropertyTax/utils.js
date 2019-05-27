@@ -95,7 +95,7 @@ let writeToFile = function (error, ward_no = '', from_date = '', to_date = '', a
 	var yyyy = today.getFullYear();
 	today =   dd + mm + yyyy;
 	api += today;
-	console.log("api: \t",api);
+	console.log("error: \t",JSON.stringify(message));
 	try {
 		fs.appendFile(`./output/${api}.txt`, JSON.stringify(message), function (err) {
 			if (err) throw err;

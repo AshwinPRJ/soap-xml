@@ -103,7 +103,7 @@ async function add2Graph(acc, jsonData, index) {
       error: error,
       PID: jsonData["property_master"]["PID"]
     }
-    utils.writeToFile(JSON.stringify(addPID), wardNo, fromDate, toDate, api);
+    utils.writeToFile(addPID, wardNo, fromDate, toDate, api);
     return error;
   }
 }
