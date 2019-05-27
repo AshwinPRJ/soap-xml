@@ -127,4 +127,5 @@ INSERT INTO tblcron_params (API,  from_year, to_year)
 VALUES ('GetPropertyTaxDCBDetails',  '2017-18', '2017-18');
 INSERT INTO tblcron_params (API,  from_date, to_date)
 VALUES ('GetSASTaxDetails',  '2018-01-01', '2019-01-01');
+SET GLOBAL max_allowed_packet=1073741824;
 select * from tblcron_params;

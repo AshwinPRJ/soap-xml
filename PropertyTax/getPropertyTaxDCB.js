@@ -1,17 +1,21 @@
 const soapRequest = require('easy-soap-request');
 const fs = require('fs');
+const utils = require('./utils.js');
 const args = require("commander");
-const json2csv = require('json2csv').Parser
+const addToNeo4jDB = require('./propertyDCBLoader.js');
 var xml2json = require('xml2json');
 var log4js = require('log4js');
+const db = require("./neo4j-helper");
+const BPromise = require("bluebird");
 var logger = log4js.getLogger();
 var mysql = require('mysql');
+let log_record = [];
 logger.level = 'debug';
 var config = require('./config/dbconfig.js');
 var connection = mysql.createConnection(config.databaseOptions);
 const url = 'http://117.239.141.230/eoasis/indiancst.asmx';
-let wardNo = "",
-    fromYear = "",
+let wardNo = "";
+let fromYear = "",
     toYear = "",
     fromPID = "",
     toPID = "";
@@ -23,6 +27,7 @@ const headers = {
 };
 args
     .version('0.1.0')
+    .option('-c, --start []', 'run getPropertyTaxDCB')
     .option('-w, --wardNo []', 'Ward No')
     .option('-s, --fromYear []', 'from year')
     .option('-e, --toYear []', 'to year')
@@ -30,53 +35,77 @@ args
     .option('-t, --toPID []', 'to pid')
     .parse(process.argv);
 
-connection.connect(function (err) {
-    if (err) killTheProcess(err);
-    logger.info("Successfully connected to database...");
-    if (args.wardNo == undefined) {
-        getLastParams();
-    } else {
-        start(args);
-    }
-});
+
+if (args.start != undefined) {
+    dbConnect();
+}
+
+function dbConnect() {
+    connection.connect(async function (err) {
+        if (err) killTheProcess(err);
+        logger.info("Successfully connected to database...");
+        if (args.wardNo == undefined) {
+            await getLastParams();
+        } else {
+            await start(args);
+        }
+    });
+}
 
 function killTheProcess(err) {
-    writeToFile(err, wardNo, fromYear, toYear);
+    utils.writeToFile(err, wardNo, fromYear, toYear, api);
     logger.info("ERROR: ", err);
     connection.end();
     logger.info("KILLING THE PROCESS");
     process.exit(22);
 }
 
-function getLastParams() {
+let getLastParams = function () {
     let sql = `SELECT * FROM tblcron_params where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
-    try {
-        connection.query(sql, async function (err, result) {
-            if (err) killTheProcess(err);
-            logger.info(`got last requested params `, JSON.stringify(result));
-            if (result.length == 0 || !result[0]["from_year"] || !result[0]["to_year"]) {
-                logger.info(`\nFrom_year (or) To_year (or) Ward_no in null in DB.\n -----Please check your DB data-----`);
-                killTheProcess('From_year (or) To_year (or) Ward_no in null in DB.\n -----Please check your DB data-----');
-            }
-            fromYear = result[0]["to_year"];
-            var temp = fromYear.split('-');
-            var last2digit = new Date().getFullYear().toString().substr(-2);
-            toYear = "20" + last2digit - 1 + "-" + last2digit;
-            console.log("toYear", toYear);
-            for (var i = 1; i <= 35; i++) {
-                await getPropertyTaxDCBDetails(i, fromYear, toYear, fromPID = '', toPID = '');
-                if (i == 35) {
-                    await insertParam()
-                    connection.end();
+    return new Promise((resolve, reject) => {
+        try {
+            connection.query(sql, async function (err, result) {
+                if (err) {
+                    killTheProcess(err);
+                    reject({
+                        status: false,
+                        msg: err
+                    });
                 }
-            }
-            return;
-        });
-    } catch (error) {
-        logger.error("error occure while getting 'from-year and to-year from DB\n", error);
-        killTheProcess(error);
-        return;
-    }
+                logger.info(`got last requested params `, JSON.stringify(result));
+                if (result.length == 0 || !result[0]["from_year"] || !result[0]["to_year"]) {
+                    logger.info(`\nFrom_year (or) To_year `);
+                    killTheProcess('From_year (or) To_year');
+                    reject({
+                        status: false,
+                        msg: 'From_date (or) To_date in null in DB'
+                    });
+                }
+                var last2digit = new Date().getFullYear().toString().substr(-2);
+                let current = parseInt(last2digit) + 1;
+                fromYear = "20" + last2digit + "-" + current;
+                toYear = fromYear;
+                for (var i = 1; i <= 35; i++) {
+                    await getPropertyTaxDCBDetails(i, fromYear, toYear, fromPID, toPID);
+                    if (i == 35) {
+                        await insertParam(api, i, fromYear, toYear);
+                        connection.end();
+                    }
+                }
+                resolve({
+                    status: true,
+                    msg: "DCB Details successfully inserted"
+                });
+            });
+        } catch (error) {
+            logger.error("error occure while getting 'from-year and to-year from DB\n", error);
+            killTheProcess(error);
+            reject({
+                status: false,
+                msg: error
+            });
+        }
+    });
 };
 
 async function start(args) {
@@ -127,11 +156,23 @@ async function makeRequest(wardNo, xml) {
         }
         logger.info("converted xml to json ");
         var values = json["data"].map(el => Object.values(el));
-        await insertDB(json.keys, values, wardNo);;
-        return;
+        await insertDB(json.keys, values, wardNo);
+
+        let params = {
+            "fromYear": fromYear,
+            "toYear": toYear,
+            "wardNo": wardNo
+        }
+        json["data"][0]["params"] = params;
+
+        await BPromise.reduce(json["data"], addToNeo4jDB.add2Graph, log_record)
+            .then(function (log_record) {
+                db.close();
+                return;
+            })
     } catch (e) {
-        logger.error(`error occurred for ward ${wardNo} `, e);
-        await writeToFile(e, wardNo);
+        logger.error(`Exception occurred for ward No: ${wardNo} `, e);
+        utils.writeToFile(e, wardNo, fromYear, toYear, api);
         return;
     }
 }
@@ -156,58 +197,43 @@ function convertXMLToJson(body) {
 
 function insertDB(keys, values, wardNo) {
     let sql = `INSERT INTO tblproperty_dcb_details (${keys}) VALUES ?`;
-    try {
+    return new Promise((resolve, reject) => {
         logger.info("inserting into database");
         connection.query(sql, [values], function (err, result) {
             if (err) {
                 logger.info(`error occured while inserting data for ward no: ${wardNo}`);
-                writeToFile(err, wardNo, fromYear, toYear);
-                return;
+                delete err["sql"];
+                //utils.writeToFile(err, wardNo, fromYear, toYear, api);
+                reject(err);
             }
             logger.info(`affectedRows for ward no: ${wardNo} : `, result["affectedRows"]);
             logger.info(`Data successfully inserted for ward no: ${wardNo}`);
-            return;
+            resolve(result);
         });
-    } catch (error) {
-        logger.error(`Error occured while insering data of ward No. ${wardNo}. \n ErrorMsg: `, error);
-        writeToFile(error, wardNo, fromYear, toYear);
-        return;
-    }
+    });
 }
-function insertParam() {
+
+function insertParam(api, wardNo, fromYear, toYear) {
     var post = {
         api: api
     };
     if (fromYear != "") post.from_year = fromYear;
     if (toYear != "") post.to_year = toYear;
-    console.log("post: ", post)
-    try {
-        var query = connection.query('INSERT INTO tblcron_params SET ?', post, function(error, results, fields) {
-            if (error) throw error;
-            logger.info(`affectedRows for ward no: ${wardNo} : `, results["affectedRows"]);
-            return "successfully insert the params "
+    return new Promise((resolve, reject) => {
+        connection.query('INSERT INTO tblcron_params SET ?', post, function (error, results, fields) {
+            if (error) {
+                logger.error(`error occured while inserting params data `);
+                delete error["sql"];
+                //utils.writeToFile(error, wardNo, fromDate, toDate, api);
+                reject(error);
+            }
+            logger.info(`inserted params to cron table `, post);
+            resolve(results);
         });
-        logger.info("inserted param to cron table",query.sql);
-    } catch (e) {
-        logger.error(`Error occured while insering input params. ${wardNo}. \n ErrorMsg: `, e);
-        writeToFile(e, wardNo, fromYear, toYear);
-        return;
-    }
+    });
 }
-function writeToFile(error, ward_no = '', from_year = '', to_year = '') {
-    const message = {
-        ward_no,
-        from_year,
-        to_year,
-        error
-    }
-    try {
-        fs.appendFile(`./output/getPropertyTaxDCBDetails.txt`, JSON.stringify(message), (err) => {
-            if (err) throw err;
-            logger.info(`Error data saved in file...`);
-        });
-    } catch (error) {
-        logger.error(`error occured while saving to file for ward No: ${wardNo} `, error);
-        return;        
-    }
-}
+
+
+module.exports = {
+    getLastParams
+};
