@@ -1,10 +1,10 @@
-drop table tblsas_floor_details;
-drop table tblsas_master_details;
-drop table tblproperty_dcb_details;
-drop table tblproperty_details;
-drop table tblcron_params;
+drop table tblsas_floor_details_api;
+drop table tblsas_master_details_api;
+drop table tblproperty_dcb_details_api;
+drop table tblproperty_details_api;
+drop table tblcron_params_api;
 
-CREATE TABLE `tblproperty_details` (
+CREATE TABLE `tblproperty_details_api` (
   `PID` varchar(345) CHARACTER SET utf8 NOT NULL,
   `WardNo` varchar(345) CHARACTER SET utf8 DEFAULT NULL,
   `OldAssessmentNo` varchar(345) CHARACTER SET utf8 DEFAULT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE `tblproperty_details` (
   PRIMARY KEY (`PID`)
 );
 
-CREATE TABLE `tblproperty_dcb_details` (
+CREATE TABLE `tblproperty_dcb_details_api` (
   `DCBID` int NOT NULL AUTO_INCREMENT,
   `PID` varchar(345) CHARACTER SET utf8 NOT NULL,
   `AssessmentYear` varchar(345) CHARACTER SET utf8 DEFAULT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE `tblproperty_dcb_details` (
   PRIMARY KEY (`DCBID`)
 );
 
-CREATE TABLE `tblsas_master_details` (
+CREATE TABLE `tblsas_master_details_api` (
   `SASID` varchar(345) CHARACTER SET utf8 NOT NULL,
   `PID` varchar(345) CHARACTER SET utf8 NOT NULL,
   `AssessmentYear` varchar(345) CHARACTER SET utf8 DEFAULT NULL,
@@ -87,7 +87,7 @@ CREATE TABLE `tblsas_master_details` (
   PRIMARY KEY (`SASID`)
 );
 
-CREATE TABLE `tblsas_floor_details` (
+CREATE TABLE `tblsas_floor_details_api` (
   `SNo` int NOT NULL AUTO_INCREMENT,
   `SASID` varchar(345) CHARACTER SET utf8 NOT NULL,
   `PID` varchar(345) CHARACTER SET utf8 DEFAULT NULL,
@@ -103,7 +103,7 @@ CREATE TABLE `tblsas_floor_details` (
   FOREIGN KEY (SASID) REFERENCES tblsas_master_details(SASID)
 );
 
-CREATE TABLE `tblcron_params`(
+CREATE TABLE `tblcron_params_api`(
   `SNo` int AUTO_INCREMENT,
   `API` varchar(345) CHARACTER SET utf8 DEFAULT NULL,
   `from_date` DATE  DEFAULT NULL,
@@ -114,19 +114,19 @@ CREATE TABLE `tblcron_params`(
   KEY (`SNo`)
 );
 
-INSERT INTO tblcron_params (API,  from_date, to_date)
+INSERT INTO tblcron_params_api (API,  from_date, to_date)
 VALUES ('GetMar19Details',  '2018-01-01', '2018-01-01');
-INSERT INTO tblcron_params (API,  from_date, to_date)
+INSERT INTO tblcron_params_api (API,  from_date, to_date)
 VALUES ('GetModifiedPropertyDetails',  '2018-01-01', '2018-01-01');
-INSERT INTO tblcron_params (API,  from_year, to_year)
+INSERT INTO tblcron_params_api (API,  from_year, to_year)
 VALUES ('GetPropertyTaxDCBDetails',  '2017-18', '2017-18');
-INSERT INTO tblcron_params (API,  from_date, to_date)
+INSERT INTO tblcron_params_api (API,  from_date, to_date)
 VALUES ('GetSASTaxDetails',  '2018-01-01', '2019-01-01');
 SET GLOBAL max_allowed_packet=1073741824;
-select * from tblcron_params;
-select * from tblproperty_details where PID ="99989";
-select * from tblproperty_details;
-select* from tblsas_master_details;
-select* from tblsas_floor_details;
-select count(TotalArea) from tblproperty_details where TotalArea = 0;
-select * from tblsas_master_details where PID = "104687"
+select * from tblcron_params_api;
+select * from tblproperty_details_api where PID ="99989";
+select * from tblproperty_details_api;
+select* from tblsas_master_details_api;
+select* from tblsas_floor_details_api;
+select count(TotalArea) from tblproperty_details_api where TotalArea = 0;
+select * from tblsas_master_details_api where PID = "104687"

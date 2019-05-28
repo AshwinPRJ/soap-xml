@@ -55,6 +55,7 @@ function killTheProcess(err) {
 	logger.info("ERROR: ", err);
 	logger.info("KILLING THE PROCESS");
 	process.exit(22);
+	return;
 }
 
 let getLastParams = function () {
