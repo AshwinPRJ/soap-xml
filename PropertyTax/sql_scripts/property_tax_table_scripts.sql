@@ -104,7 +104,7 @@ CREATE TABLE `tblsas_floor_details_api` (
   `BuildingAge` varchar(345)  DEFAULT NULL,
   `SelfTenant` varchar(345)  DEFAULT NULL,
   PRIMARY KEY (`SNo`),
-  FOREIGN KEY (SASID) REFERENCES tblsas_master_details(SASID)
+  FOREIGN KEY (SASID) REFERENCES tblsas_master_details_api(SASID)
 );
 
 CREATE TABLE `tblcron_params_api`(
