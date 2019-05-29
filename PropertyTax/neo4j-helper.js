@@ -4,11 +4,10 @@
 
 const neo4j = require("neo4j-driver").v1;
 const util = require("util");
-const settings = require("./config.js")();
 const jUtils = require("./json-utils.js");
 const schema = require("./pt-schema.js");
 
-const uri = settings.boltUri;
+const uri = "bolt://localhost:7687";
 const user = "neo4j", pass = "nviera@123";
 const driver = neo4j.driver(uri, neo4j.auth.basic(user, pass));
 const session = driver.session();
