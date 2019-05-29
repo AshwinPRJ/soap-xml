@@ -61,7 +61,7 @@ function killTheProcess(err) {
 }
 
 let getLastParams = function () {
-    let sql = `SELECT * FROM tblcron_params where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
+    let sql = `SELECT * FROM tblcron_params_api where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
     return new Promise((resolve, reject) => {
         try {
             connection.query(sql, async function (err, result) {
@@ -201,7 +201,7 @@ function convertXMLToJson(body) {
 }
 
 function insertDB(keys, values, wardNo) {
-    let sql = `INSERT INTO tblproperty_dcb_details (${keys}) VALUES ?`;
+    let sql = `INSERT INTO tblproperty_dcb_details_api (${keys}) VALUES ?`;
     return new Promise((resolve, reject) => {
         logger.info("inserting into database");
         connection.query(sql, [values], function (err, result) {
@@ -227,7 +227,7 @@ function insertParam(api, wardNo, fromYear, toYear) {
     if (fromYear != "") post.from_year = fromYear;
     if (toYear != "") post.to_year = toYear;
     return new Promise((resolve, reject) => {
-        connection.query('INSERT INTO tblcron_params SET ?', post, function (error, results, fields) {
+        connection.query('INSERT INTO tblcron_params_api SET ?', post, function (error, results, fields) {
             if (error) {
                 logger.error(`error occured while inserting params data `);
                 delete error["sql"];

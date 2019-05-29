@@ -60,7 +60,7 @@ function killTheProcess(err) {
 }
 
 let getLastParams = function () {
-  let sql = `SELECT * FROM tblcron_params where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
+  let sql = `SELECT * FROM tblcron_params_api where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
   return new Promise((resolve, reject) => {
     try {
       connection.query(sql, async function (err, result) {
@@ -244,7 +244,7 @@ async function convertXMLToJson(body) {
     })
   });
   let finalSASList = await utils.removeObj(sasList);
-  console.log("finalSASList: \t", finalSASList);
+  //console.log("finalSASList: \t", finalSASList);
   var table = {
     "floor": mapSasToFloors,
     "sasList": finalSASList
@@ -253,8 +253,8 @@ async function convertXMLToJson(body) {
 }
 
 function insertDB(keys, values, wardNo) {
-  let sasMaster = `INSERT INTO tblsas_master_details (${keys["sasTableFileds"]}) VALUES ?`;
-  let sasFloor = `INSERT INTO tblsas_floor_details (${keys["floorFeilds"]}) VALUES ?`;
+  let sasMaster = `INSERT INTO tblsas_master_details_api (${keys["sasTableFileds"]}) VALUES ?`;
+  let sasFloor = `INSERT INTO tblsas_floor_details_api (${keys["floorFeilds"]}) VALUES ?`;
   return new Promise((resolve, reject) => {
     connection.query(sasMaster, [values["sasDetails"]], function (err, result) {
       if (err) {
@@ -262,7 +262,7 @@ function insertDB(keys, values, wardNo) {
         reject(err);
         return;
       }
-      logger.info("affectedRows in sas master table:  ", result);
+      logger.info("affectedRows in sas master table:  ", result["affectedRows"]);
       logger.info(`SAS Master Data successfully inserted for ward no: ${wardNo}`);
       if (keys["floorFeilds"] != "") {
         connection.query(sasFloor, [values["floor"]], function (err, result1) {
@@ -271,7 +271,7 @@ function insertDB(keys, values, wardNo) {
             reject(err);
             return;
           }
-          //logger.info("affectedRows in floor table: ", result1["affectedRows"]);
+          logger.info("affectedRows in floor table: ", result1["affectedRows"]);
           logger.info(`SAS Floor Data successfully inserted for ward no: ${wardNo}`);
           resolve({
             result,
@@ -296,7 +296,7 @@ function insertParam(api, wardNo, fromDate, toDate) {
   if (fromDate != "") post.from_date = new Date(fromDate);
   if (toDate != "") post.to_date = new Date(toDate);
   return new Promise((resolve, reject) => {
-    connection.query('INSERT INTO tblcron_params SET ?', post, function (error, results, fields) {
+    connection.query('INSERT INTO tblcron_params_api SET ?', post, function (error, results, fields) {
       if (error) {
         logger.error(`error occured while inserting params data `);
         delete error["sql"];

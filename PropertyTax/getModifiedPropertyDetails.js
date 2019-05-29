@@ -53,7 +53,7 @@ function dbConnect() {
     });
 }
 let getLastParams = function () {
-    let sql = `SELECT * FROM tblcron_params where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
+    let sql = `SELECT * FROM tblcron_params_api where api = '${api}' ORDER BY SNo DESC LIMIT 1`;
     return new Promise((resolve, reject) => {
         try {
             connection.query(sql, async function (err, result) {
@@ -177,7 +177,7 @@ function updateDB(values, i) {
     var data = values["data"];
     let pid = data[i]["PID"];
     return new Promise((resolve, reject) => {
-        connection.query('update tblproperty_details set ? where ?', [data[i], {
+        connection.query('update tblproperty_details_api set ? where ?', [data[i], {
             PID: pid
         }], function (err, result) {
             if (err) {
@@ -203,7 +203,7 @@ let insertParam = function (api, fromDate, toDate) {
     if (fromDate != "") post.from_date = new Date(fromDate);
     if (toDate != "") post.to_date = new Date(toDate);
     return new Promise((resolve, reject) => {
-        connection.query('INSERT INTO tblcron_params SET ?', post, function (error, results, fields) {
+        connection.query('INSERT INTO tblcron_params_api SET ?', post, function (error, results, fields) {
             if (error) {
                 delete error["sql"];
                 //utils.writeToFile(err, '', fromDate, toDate, api);

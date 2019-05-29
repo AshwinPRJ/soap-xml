@@ -1,0 +1,1 @@
+{"ward_no":"1","from_date":"","to_date":"","error":{"code":"ER_DUP_ENTRY","errno":1062,"sqlMessage":"Duplicate entry '3190' for key 'PRIMARY'","sqlState":"23000","index":0},"api":"GetMar19Details"}
