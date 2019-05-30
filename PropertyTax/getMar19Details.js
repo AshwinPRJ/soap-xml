@@ -39,13 +39,17 @@ if (args.start != undefined) {
 
 function dbConnect() {
 	connection.connect(async function (err) {
-		if (err) killTheProcess(err);
+		if (err){
+			killTheProcess(err) ;
+			return;
+		} 
 		logger.info("Successfully connected to database...");
 		if (args.wardNo == undefined) {
 			await getLastParams();
 		} else {
 			await start(args);
 		}
+		return;
 	});
 }
 
