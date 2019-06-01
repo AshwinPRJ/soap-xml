@@ -47,8 +47,7 @@ async function add2Graph(acc, jsonData, index) {
   commandSet.push(db.setRelation(propNode, ownerNode, "OWNED_BY"));
   commandSet.push(db.setRelation(propNode, ward, "LOCATED_IN"));
   commandSet.push(db.setRelation(propNode, year, "ASSESSMENT_YR"));
-  commandSet.push(db.setRelation(propNode, year, "DCB"));
-  commandSet.push(db.setRelation(propNode, year, "TAX_PAYMENT"));
+
   ////////////////////////////////////////////////ISSUE CHECKING////////////////////////////////////////////////////////////////////
   //console.log("propData.TotalArea:>>> ", propData.TotalArea)
   if (propData.TotalArea == "" || propData.TotalArea == "-" || propData.TotalArea == "0") {
