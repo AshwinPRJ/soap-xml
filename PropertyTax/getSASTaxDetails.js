@@ -185,7 +185,7 @@ async function makeRequest(wardNo, xml) {
       "sasDetails": sasDetails
     };
 
-    //await insertDB(key, data, wardNo);
+    await insertDB(key, data, wardNo);
     let params = {
       "fromDate": fromDate,
       "toDate": toDate,
