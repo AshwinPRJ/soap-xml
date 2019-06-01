@@ -185,7 +185,7 @@ async function makeRequest(wardNo, xml) {
       "sasDetails": sasDetails
     };
 
-    await insertDB(key, data, wardNo);
+    //await insertDB(key, data, wardNo);
     let params = {
       "fromDate": fromDate,
       "toDate": toDate,
@@ -263,6 +263,7 @@ function insertDB(keys, values, wardNo) {
     connection.query(sasMaster, [values["sasDetails"]], function (err, result) {
       if (err) {
         logger.error("error occured during inserting master ");
+        delete err["sql"];
         reject(err);
         return;
       }
@@ -272,6 +273,7 @@ function insertDB(keys, values, wardNo) {
         connection.query(sasFloor, [values["floor"]], function (err, result1) {
           if (err) {
             logger.error("error occured during inserting for floor");
+            delete err["sql"];
             reject(err);
             return;
           }
@@ -337,6 +339,7 @@ function floorStirng(body) {
       value["status"] = "NOT_PAID"
     }
     value["FloorDetails"] = JSON.stringify(value["FloorDetails"]);
+    value["OwnerName"]  = value["OwnerName"].replace(/\\/g, '||');
     Object.keys(value).forEach((k) => {
       if (typeof (value[k]) === "object" && Object.keys(value[k]).length == 0) {
         value[k] = "-";
