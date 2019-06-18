@@ -126,7 +126,7 @@ var fns = {
     cmdSet.forEach((obj) => {
        command += obj.cmd + "\n";
     });
-    //console.log("Command:", command);
+    console.log("Command:", command);
     debugger;
     return session.run(command);
   },
@@ -196,7 +196,9 @@ function getFilterProps(obj) {
   let out = "{";
   for (var i=0; i<keys.length; i++) {
     if (i>0) out += ", ";
-    if(keys[i] === "amt" || keys[i] === "TotalAmount" || keys[i] === "NotPaidAmount" || keys[i] === "TaxAmount" ){
+    if(keys[i] === "amt" || keys[i] === "TotalAmount" || keys[i] === "NotPaidAmount" || keys[i] === "TaxAmount" ||  
+      keys[i] === "TotalArea" || keys[i] === "u_type" || keys[i] === "c_type" || keys[i] === "b_type"
+      ){
       out += keys[i] + ":" +   escapeQuotes(obj[keys[i]])
     }else{
       out += keys[i] + ":" + '"' + escapeQuotes(obj[keys[i]]) + '"'
